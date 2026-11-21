@@ -1,0 +1,722 @@
+[
+  {
+    "order_id": "1031",
+    "customer_id": "C-1005",
+    "date": "2026-11-18",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Robot Vacuum R7",
+        "qty": 1,
+        "unit_price": 1599
+      }
+    ],
+    "total": 1599,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK382116655",
+    "delivered_at": "2026-11-19"
+  },
+  {
+    "order_id": "1032",
+    "customer_id": "C-1014",
+    "date": "2026-09-05",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Electric Kettle",
+        "qty": 2,
+        "unit_price": 199
+      }
+    ],
+    "total": 398,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK629908599",
+    "delivered_at": "2026-11-03"
+  },
+  {
+    "order_id": "1033",
+    "customer_id": "C-1002",
+    "date": "2026-11-14",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 1,
+        "unit_price": 899
+      }
+    ],
+    "total": 899,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK168212356",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1034",
+    "customer_id": "C-1013",
+    "date": "2026-11-01",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 2,
+        "unit_price": 129
+      }
+    ],
+    "total": 258,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK873869166",
+    "delivered_at": "2026-11-04"
+  },
+  {
+    "order_id": "1035",
+    "customer_id": "C-1018",
+    "date": "2026-10-14",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Robot Vacuum R7",
+        "qty": 1,
+        "unit_price": 1599
+      }
+    ],
+    "total": 1599,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK587182120",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1036",
+    "customer_id": "C-1001",
+    "date": "2026-11-10",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Robot Vacuum R7",
+        "qty": 1,
+        "unit_price": 1599
+      }
+    ],
+    "total": 1599,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK645098869",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1037",
+    "customer_id": "C-1020",
+    "date": "2026-09-18",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Smart Watch S5",
+        "qty": 1,
+        "unit_price": 1199
+      }
+    ],
+    "total": 1199,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK100614068",
+    "delivered_at": "2026-11-11"
+  },
+  {
+    "order_id": "1038",
+    "customer_id": "C-1016",
+    "date": "2026-10-08",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK358633898",
+    "delivered_at": "2026-11-19"
+  },
+  {
+    "order_id": "1039",
+    "customer_id": "C-1003",
+    "date": "2026-11-05",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 2,
+        "unit_price": 899
+      }
+    ],
+    "total": 1798,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK808402051",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1040",
+    "customer_id": "C-1016",
+    "date": "2026-11-14",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "USB-C Hub",
+        "qty": 1,
+        "unit_price": 189
+      }
+    ],
+    "total": 189,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK679064766",
+    "delivered_at": "2026-11-07"
+  },
+  {
+    "order_id": "1041",
+    "customer_id": "C-1010",
+    "date": "2026-11-15",
+    "status": "cancelled",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 1,
+        "unit_price": 129
+      }
+    ],
+    "total": 129,
+    "currency": "ILS",
+    "carrier": null,
+    "tracking": null,
+    "delivered_at": null
+  },
+  {
+    "order_id": "1042",
+    "customer_id": "C-1001",
+    "date": "2026-11-10",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK482913377",
+    "delivered_at": "2026-11-17"
+  },
+  {
+    "order_id": "1043",
+    "customer_id": "C-1008",
+    "date": "2026-09-02",
+    "status": "processing",
+    "items": [
+      {
+        "product": "Electric Kettle",
+        "qty": 1,
+        "unit_price": 199
+      }
+    ],
+    "total": 199,
+    "currency": "ILS",
+    "carrier": null,
+    "tracking": null,
+    "delivered_at": null
+  },
+  {
+    "order_id": "1044",
+    "customer_id": "C-1008",
+    "date": "2026-09-17",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 1,
+        "unit_price": 899
+      }
+    ],
+    "total": 899,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK399012686",
+    "delivered_at": "2026-11-16"
+  },
+  {
+    "order_id": "1045",
+    "customer_id": "C-1007",
+    "date": "2026-09-16",
+    "status": "cancelled",
+    "items": [
+      {
+        "product": "USB-C Hub",
+        "qty": 1,
+        "unit_price": 189
+      }
+    ],
+    "total": 189,
+    "currency": "ILS",
+    "carrier": null,
+    "tracking": null,
+    "delivered_at": null
+  },
+  {
+    "order_id": "1046",
+    "customer_id": "C-1014",
+    "date": "2026-11-14",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Smart Watch S5",
+        "qty": 1,
+        "unit_price": 1199
+      }
+    ],
+    "total": 1199,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK554814084",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1047",
+    "customer_id": "C-1014",
+    "date": "2026-09-13",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Noise-Cancelling Headphones",
+        "qty": 1,
+        "unit_price": 1099
+      }
+    ],
+    "total": 1099,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK464323393",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1048",
+    "customer_id": "C-1004",
+    "date": "2026-11-15",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Smart Watch S5",
+        "qty": 1,
+        "unit_price": 1199
+      }
+    ],
+    "total": 1199,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK552991960",
+    "delivered_at": "2026-11-06"
+  },
+  {
+    "order_id": "1049",
+    "customer_id": "C-1009",
+    "date": "2026-10-18",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Noise-Cancelling Headphones",
+        "qty": 1,
+        "unit_price": 1099
+      }
+    ],
+    "total": 1099,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK154318806",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1050",
+    "customer_id": "C-1018",
+    "date": "2026-09-14",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK616854671",
+    "delivered_at": "2026-11-07"
+  },
+  {
+    "order_id": "1051",
+    "customer_id": "C-1013",
+    "date": "2026-09-13",
+    "status": "returned",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK941889393",
+    "delivered_at": "2026-11-15"
+  },
+  {
+    "order_id": "1052",
+    "customer_id": "C-1010",
+    "date": "2026-09-10",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 2,
+        "unit_price": 129
+      }
+    ],
+    "total": 258,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK162795957",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1053",
+    "customer_id": "C-1019",
+    "date": "2026-09-02",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "USB-C Hub",
+        "qty": 1,
+        "unit_price": 189
+      }
+    ],
+    "total": 189,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK611947770",
+    "delivered_at": "2026-11-17"
+  },
+  {
+    "order_id": "1054",
+    "customer_id": "C-1017",
+    "date": "2026-09-03",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Wireless Earbuds",
+        "qty": 1,
+        "unit_price": 249
+      }
+    ],
+    "total": 249,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK172972420",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1055",
+    "customer_id": "C-1008",
+    "date": "2026-11-02",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 1,
+        "unit_price": 129
+      }
+    ],
+    "total": 129,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK188029013",
+    "delivered_at": "2026-11-14"
+  },
+  {
+    "order_id": "1056",
+    "customer_id": "C-1019",
+    "date": "2026-09-11",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Electric Kettle",
+        "qty": 1,
+        "unit_price": 199
+      }
+    ],
+    "total": 199,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK385201412",
+    "delivered_at": "2026-11-13"
+  },
+  {
+    "order_id": "1057",
+    "customer_id": "C-1005",
+    "date": "2026-09-01",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Robot Vacuum R7",
+        "qty": 2,
+        "unit_price": 1599
+      }
+    ],
+    "total": 3198,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK766964667",
+    "delivered_at": "2026-11-19"
+  },
+  {
+    "order_id": "1058",
+    "customer_id": "C-1004",
+    "date": "2026-09-12",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 1,
+        "unit_price": 899
+      }
+    ],
+    "total": 899,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK362298393",
+    "delivered_at": "2026-11-12"
+  },
+  {
+    "order_id": "1059",
+    "customer_id": "C-1010",
+    "date": "2026-11-17",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Wireless Earbuds",
+        "qty": 2,
+        "unit_price": 249
+      }
+    ],
+    "total": 498,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK817112652",
+    "delivered_at": "2026-11-18"
+  },
+  {
+    "order_id": "1060",
+    "customer_id": "C-1010",
+    "date": "2026-09-04",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 1,
+        "unit_price": 899
+      }
+    ],
+    "total": 899,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK694019365",
+    "delivered_at": "2026-11-05"
+  },
+  {
+    "order_id": "1061",
+    "customer_id": "C-1009",
+    "date": "2026-09-09",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Robot Vacuum R7",
+        "qty": 1,
+        "unit_price": 1599
+      }
+    ],
+    "total": 1599,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK624557080",
+    "delivered_at": "2026-11-09"
+  },
+  {
+    "order_id": "1062",
+    "customer_id": "C-1002",
+    "date": "2026-09-01",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Espresso Machine X2",
+        "qty": 2,
+        "unit_price": 899
+      }
+    ],
+    "total": 1798,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK927982963",
+    "delivered_at": "2026-11-05"
+  },
+  {
+    "order_id": "1063",
+    "customer_id": "C-1009",
+    "date": "2026-11-01",
+    "status": "returned",
+    "items": [
+      {
+        "product": "Wireless Earbuds",
+        "qty": 2,
+        "unit_price": 249
+      }
+    ],
+    "total": 498,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK180792472",
+    "delivered_at": "2026-11-05"
+  },
+  {
+    "order_id": "1064",
+    "customer_id": "C-1018",
+    "date": "2026-10-05",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK430989881",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1065",
+    "customer_id": "C-1012",
+    "date": "2026-11-08",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Blender Pro 900",
+        "qty": 1,
+        "unit_price": 349
+      }
+    ],
+    "total": 349,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK210373808",
+    "delivered_at": "2026-11-12"
+  },
+  {
+    "order_id": "1066",
+    "customer_id": "C-1018",
+    "date": "2026-09-06",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 1,
+        "unit_price": 129
+      }
+    ],
+    "total": 129,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK126614158",
+    "delivered_at": "2026-11-06"
+  },
+  {
+    "order_id": "1067",
+    "customer_id": "C-1011",
+    "date": "2026-09-04",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Laptop Stand",
+        "qty": 1,
+        "unit_price": 129
+      }
+    ],
+    "total": 129,
+    "currency": "ILS",
+    "carrier": "DHL",
+    "tracking": "TRK141580226",
+    "delivered_at": "2026-11-16"
+  },
+  {
+    "order_id": "1068",
+    "customer_id": "C-1008",
+    "date": "2026-10-08",
+    "status": "delivered",
+    "items": [
+      {
+        "product": "Smart Watch S5",
+        "qty": 2,
+        "unit_price": 1199
+      }
+    ],
+    "total": 2398,
+    "currency": "ILS",
+    "carrier": "Israel Post",
+    "tracking": "TRK125409494",
+    "delivered_at": "2026-11-07"
+  },
+  {
+    "order_id": "1069",
+    "customer_id": "C-1013",
+    "date": "2026-10-12",
+    "status": "shipped",
+    "items": [
+      {
+        "product": "Air Fryer XL",
+        "qty": 1,
+        "unit_price": 459
+      }
+    ],
+    "total": 459,
+    "currency": "ILS",
+    "carrier": "UPS",
+    "tracking": "TRK646970178",
+    "delivered_at": null
+  },
+  {
+    "order_id": "1070",
+    "customer_id": "C-1013",
+    "date": "2026-09-09",
+    "status": "processing",
+    "items": [
+      {
+        "product": "USB-C Hub",
+        "qty": 1,
+        "unit_price": 189
+      }
+    ],
+    "total": 189,
+    "currency": "ILS",
+    "carrier": null,
+    "tracking": null,
+    "delivered_at": null
+  }
+]

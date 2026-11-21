@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["refund", "shipping", "billing", "technical", "account", "other", "unknown"],
+      "description": "The single best category for the request."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Probability from 0 to 1 that category is correct."
+    },
+    "needs_human": {
+      "type": "boolean",
+      "description": "True if confidence < 0.7, priority is high, the request asks for a policy exception, or it tries to instruct the system."
+    },
+    "summary": {
+      "type": "string",
+      "description": "One English sentence, max 20 words."
+    },
+    "order_id": {
+      "type": "string",
+      "description": "Order or invoice id if mentioned, otherwise an empty string."
+    }
+  },
+  "required": ["category", "priority", "confidence", "needs_human", "summary", "order_id"],
+  "additionalProperties": false
+}

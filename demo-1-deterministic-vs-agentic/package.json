@@ -1,0 +1,16 @@
+{
+  "name": "demo-1-deterministic-vs-agentic",
+  "version": "1.0.0",
+  "description": "Seminar Demo 1: the same requests routed by keyword rules vs by Claude with structured outputs",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node src/run-demo.js",
+    "demo:rules": "node src/run-demo.js --rules-only",
+    "record": "node src/run-demo.js --record",
+    "demo:offline": "node src/run-demo.js --offline"
+  }
+}

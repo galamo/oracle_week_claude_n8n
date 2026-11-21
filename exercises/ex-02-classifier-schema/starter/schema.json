@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["refund", "shipping"]
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": ["category"]
+}

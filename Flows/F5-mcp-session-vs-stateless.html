@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 8 v2 — MCP session vs stateless</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(92,200,255,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(177,140,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--req)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+
+.mode-toggle{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+}
+.mode-toggle .label{color:var(--muted);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+.mode-toggle button{
+  font:500 .82rem var(--mono);color:var(--muted);background:transparent;
+  border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;
+}
+.mode-toggle button:hover{border-color:var(--muted);color:var(--ink)}
+.mode-toggle button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+.mode-toggle button[aria-pressed="true"]{border-color:var(--sse);color:var(--sse);background:rgba(94,234,212,.06)}
+.mode-toggle button[data-mode="stateless"][aria-pressed="true"]{border-color:var(--ok);color:var(--ok);background:rgba(61,220,151,.06)}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+
+.compare{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+}
+.compare article{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  font-size:.82rem;line-height:1.55;color:var(--muted);
+}
+.compare h3{margin:0 0 10px;font-family:var(--display);font-size:1.05rem;font-weight:600}
+.compare h3.sess{color:var(--sse)}
+.compare h3.stat{color:var(--ok)}
+.compare table{width:100%;border-collapse:collapse;font-size:.78rem}
+.compare th,.compare td{text-align:left;padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.compare th{color:var(--dim);font-weight:500;width:38%}
+.compare td code{color:var(--ink)}
+.compare .strike{text-decoration:line-through;color:var(--err);opacity:.85}
+@media (max-width:760px){.compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Lab 8 v2 — <em>session</em> vs stateless</h1>
+    <span class="meta">Cursor · Quiz MCP · Streamable HTTP</span>
+  </header>
+  <p class="lede">Same host and quiz tools (<code>list_topics</code>, <code>get_question</code>, <code>check_answer</code>) on <code>localhost:3200/mcp</code>. Toggle the protocol date: sticky <strong style="color:var(--ink);font-weight:500">sessions</strong> (2025-11-25) vs <strong style="color:var(--ink);font-weight:500">stateless</strong> POSTs (2026-07-28).</p>
+
+  <div class="mode-toggle" role="group" aria-label="Protocol mode">
+    <span class="label">Spec</span>
+    <button type="button" data-mode="session" aria-pressed="true">2025-11-25 (sessions)</button>
+    <button type="button" data-mode="stateless" aria-pressed="false">2026-07-28 (stateless)</button>
+  </div>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 520" role="img" aria-label="Cursor host talking to Quiz MCP — session mode versus stateless Streamable HTTP">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+      <marker id="arrowSse" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5eead4"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="520" fill="url(#grid)"/>
+
+    <!-- LEFT: CURSOR (shared) -->
+    <g id="client" transform="translate(0 0)">
+      <rect id="clientFrame" x="36" y="40" width="280" height="420" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M36 56a18 18 0 0 1 18-16h244a18 18 0 0 1 18 16v22H36z" fill="#1d2a38"/>
+      <circle cx="58" cy="52" r="4" fill="#ff6b6b"/><circle cx="72" cy="52" r="4" fill="#ffb547"/><circle cx="86" cy="52" r="4" fill="#3ddc97"/>
+      <text x="108" y="56" fill="#8297ab" font-size="12">CURSOR · MCP host</text>
+
+      <rect x="52" y="100" width="248" height="64" rx="12" fill="#16212d" stroke="#2a3a4b"/>
+      <text x="68" y="124" fill="#8297ab" font-size="10">YOU</text>
+      <text id="userBubble" x="68" y="146" fill="#e6edf3" font-size="14">quiz me on MCP</text>
+
+      <rect id="agentCard" x="52" y="184" width="248" height="88" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+      <text x="68" y="210" fill="#4d6276" font-size="10">AGENT</text>
+      <text id="agentLine1" x="68" y="234" fill="#4d6276" font-size="13">idle</text>
+      <text id="agentLine2" x="68" y="254" fill="#4d6276" font-size="11"></text>
+
+      <rect id="cfgCard" x="52" y="292" width="248" height="88" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="68" y="316" fill="#8297ab" font-size="10">.cursor/mcp.json</text>
+      <text x="68" y="338" fill="#e6edf3" font-size="12">transport: "http"</text>
+      <text id="cfgUrl" x="68" y="356" fill="#4d6276" font-size="11">url → localhost:3200/mcp</text>
+      <text id="cfgProto" x="68" y="374" fill="#4d6276" font-size="10">protocol: 2025-11-25</text>
+
+      <text x="176" y="420" fill="#8297ab" font-size="13" text-anchor="middle" letter-spacing="2">HOST</text>
+      <text x="176" y="438" fill="#4d6276" font-size="10" text-anchor="middle">discovers · calls tools · shows Q</text>
+    </g>
+
+    <!-- ========== SESSION MODE LAYERS ========== -->
+    <g id="sessionMode">
+      <!-- Wires -->
+      <g id="wireSess">
+        <path id="wirePost" d="M316 160 H460" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+        <path id="wireSse" d="M460 230 H316" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowSse)" opacity=".45"/>
+        <path id="wireRes" d="M460 300 H316" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+        <path id="wireDel" d="M316 380 H460" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".35"/>
+
+        <text id="wirePostLbl" x="388" y="148" fill="#4d6276" font-size="11" text-anchor="middle">POST · JSON-RPC</text>
+        <text id="wireSseLbl" x="388" y="218" fill="#4d6276" font-size="11" text-anchor="middle">GET · SSE</text>
+        <text id="wireResLbl" x="388" y="288" fill="#4d6276" font-size="11" text-anchor="middle">tool result</text>
+        <text id="wireDelLbl" x="388" y="368" fill="#4d6276" font-size="11" text-anchor="middle">DELETE · end</text>
+
+        <rect id="urlBadge" x="333" y="430" width="110" height="28" rx="14" fill="#121c28" stroke="#2a3a4b"/>
+        <text id="urlText" x="388" y="448" fill="#4d6276" font-size="10" text-anchor="middle">:3200/mcp</text>
+      </g>
+
+      <!-- RIGHT: single Quiz MCP -->
+      <g id="mcp" transform="translate(0 0)">
+        <rect id="mcpFrame" x="500" y="40" width="544" height="420" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M500 56a18 18 0 0 1 18-16h508a18 18 0 0 1 18 16v22H500z" fill="#1d2a38"/>
+        <circle class="mcpLed" cx="522" cy="52" r="4" fill="#2a3a4b"/><circle class="mcpLed" cx="536" cy="52" r="4" fill="#2a3a4b"/>
+        <text x="556" y="56" fill="#8297ab" font-size="12">QUIZ MCP SERVER · one process</text>
+        <text x="1020" y="56" fill="#4d6276" font-size="10" text-anchor="end">Express :3200</text>
+
+        <rect id="httpLayer" x="520" y="96" width="504" height="78" rx="14" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="538" y="120" fill="#8297ab" font-size="10">STREAMABLE HTTP · Express /mcp</text>
+        <g id="verbPost">
+          <rect class="vBox" x="538" y="132" width="140" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+          <text x="608" y="150" fill="#8297ab" font-size="12" text-anchor="middle">POST</text>
+        </g>
+        <g id="verbGet">
+          <rect class="vBox" x="692" y="132" width="140" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+          <text x="762" y="150" fill="#8297ab" font-size="12" text-anchor="middle">GET · SSE</text>
+        </g>
+        <g id="verbDel">
+          <rect class="vBox" x="846" y="132" width="158" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+          <text x="925" y="150" fill="#8297ab" font-size="12" text-anchor="middle">DELETE</text>
+        </g>
+
+        <rect id="sessionLayer" x="520" y="190" width="504" height="72" rx="14" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="538" y="214" fill="#4d6276" font-size="10">SESSION · transports Map</text>
+        <text id="sessionText" x="538" y="240" fill="#4d6276" font-size="13">no session yet</text>
+        <text id="sessionSub" x="780" y="240" fill="#4d6276" font-size="11">StreamableHTTPServerTransport</text>
+
+        <rect id="toolsLayer" x="520" y="278" width="504" height="124" rx="14" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="538" y="302" fill="#4d6276" font-size="10">TOOLS · createQuizMcpServer()</text>
+
+        <g id="tool0">
+          <rect class="tBox" x="538" y="316" width="150" height="60" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="558" cy="336" r="5" fill="#2a3a4b"/>
+          <text x="572" y="340" fill="#e6edf3" font-size="12" font-weight="600">list_topics</text>
+          <text x="548" y="360" fill="#4d6276" font-size="10">topics · counts</text>
+        </g>
+        <g id="tool1">
+          <rect class="tBox" x="702" y="316" width="150" height="60" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="722" cy="336" r="5" fill="#2a3a4b"/>
+          <text x="736" y="340" fill="#e6edf3" font-size="12" font-weight="600">get_question</text>
+          <text x="712" y="360" fill="#4d6276" font-size="10">topicId · next Q</text>
+        </g>
+        <g id="tool2">
+          <rect class="tBox" x="866" y="316" width="140" height="60" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="886" cy="336" r="5" fill="#2a3a4b"/>
+          <text x="900" y="340" fill="#e6edf3" font-size="12" font-weight="600">check_answer</text>
+          <text x="876" y="360" fill="#4d6276" font-size="10">validate</text>
+        </g>
+
+        <text x="772" y="440" fill="#8297ab" font-size="13" text-anchor="middle" letter-spacing="2">MCP</text>
+      </g>
+    </g>
+
+    <!-- ========== STATELESS MODE LAYERS ========== -->
+    <g id="statelessMode" opacity="0" pointer-events="none">
+      <!-- LB -->
+      <g id="lb">
+        <rect id="lbFrame" x="348" y="200" width="120" height="100" rx="14" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <text x="408" y="230" fill="#8297ab" font-size="10" text-anchor="middle">LOAD BALANCER</text>
+        <text id="lbRoute" x="408" y="258" fill="#4d6276" font-size="12" text-anchor="middle">idle</text>
+        <text x="408" y="280" fill="#4d6276" font-size="10" text-anchor="middle">round-robin</text>
+      </g>
+
+      <path id="wireLbIn" d="M316 250 H348" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireLbA" d="M468 230 H520" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireLbB" d="M468 270 H520" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireStatRes" d="M520 340 H316" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+      <text id="wireLbInLbl" x="332" y="238" fill="#4d6276" font-size="10" text-anchor="middle">POST</text>
+      <text id="wireStatResLbl" x="410" y="360" fill="#4d6276" font-size="11" text-anchor="middle">result · may stream</text>
+
+      <!-- Ghost removed labels -->
+      <g id="removedLabels" opacity="0">
+        <text x="408" y="140" fill="#ff6b6b" font-size="11" text-anchor="middle" text-decoration="line-through" style="text-decoration:line-through">GET · SSE</text>
+        <text x="408" y="156" fill="#ff6b6b" font-size="10" text-anchor="middle">removed in 2026-07-28</text>
+        <text x="408" y="400" fill="#ff6b6b" font-size="11" text-anchor="middle" text-decoration="line-through" style="text-decoration:line-through">DELETE · session</text>
+        <text x="408" y="416" fill="#ff6b6b" font-size="10" text-anchor="middle">removed in 2026-07-28</text>
+      </g>
+
+      <!-- Instance A -->
+      <g id="instA" transform="translate(0 0)">
+        <rect id="instAFrame" x="520" y="40" width="524" height="200" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M520 56a16 16 0 0 1 16-16h492a16 16 0 0 1 16 16v20H520z" fill="#1d2a38"/>
+        <circle class="ledA" cx="540" cy="50" r="4" fill="#2a3a4b"/><circle class="ledA" cx="554" cy="50" r="4" fill="#2a3a4b"/>
+        <text x="574" y="54" fill="#8297ab" font-size="12">INSTANCE A · Quiz MCP</text>
+        <text x="1020" y="54" fill="#4d6276" font-size="10" text-anchor="end">:3200/mcp</text>
+
+        <rect id="instAHttp" x="536" y="84" width="492" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="552" y="104" fill="#8297ab" font-size="10">POST only · headers route the method</text>
+        <text id="instAHdr" x="552" y="122" fill="#4d6276" font-size="11">Mcp-Method · Mcp-Name · MCP-Protocol-Version</text>
+
+        <g id="aTool0">
+          <rect class="tBox" x="536" y="148" width="150" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="554" cy="166" r="4" fill="#2a3a4b"/>
+          <text x="566" y="170" fill="#e6edf3" font-size="11" font-weight="600">list_topics</text>
+          <text x="546" y="188" fill="#4d6276" font-size="10">topics</text>
+        </g>
+        <g id="aTool1">
+          <rect class="tBox" x="700" y="148" width="150" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="718" cy="166" r="4" fill="#2a3a4b"/>
+          <text x="730" y="170" fill="#e6edf3" font-size="11" font-weight="600">get_question</text>
+          <text x="710" y="188" fill="#4d6276" font-size="10">topicId</text>
+        </g>
+        <g id="aTool2">
+          <rect class="tBox" x="864" y="148" width="148" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="882" cy="166" r="4" fill="#2a3a4b"/>
+          <text x="894" y="170" fill="#e6edf3" font-size="11" font-weight="600">check_answer</text>
+          <text x="874" y="188" fill="#4d6276" font-size="10">validate</text>
+        </g>
+
+        <!-- cache badge -->
+        <g id="cacheBadge" opacity="0">
+          <rect x="900" y="90" width="110" height="24" rx="12" fill="#121c28" stroke="#3ddc97"/>
+          <text x="955" y="106" fill="#3ddc97" font-size="11" text-anchor="middle">cache · ttl</text>
+        </g>
+      </g>
+
+      <!-- Instance B -->
+      <g id="instB" transform="translate(0 0)">
+        <rect id="instBFrame" x="520" y="260" width="524" height="200" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M520 276a16 16 0 0 1 16-16h492a16 16 0 0 1 16 16v20H520z" fill="#1d2a38"/>
+        <circle class="ledB" cx="540" cy="270" r="4" fill="#2a3a4b"/><circle class="ledB" cx="554" cy="270" r="4" fill="#2a3a4b"/>
+        <text x="574" y="274" fill="#8297ab" font-size="12">INSTANCE B · Quiz MCP</text>
+        <text x="1020" y="274" fill="#4d6276" font-size="10" text-anchor="end">identical replica</text>
+
+        <rect id="instBHttp" x="536" y="304" width="492" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="552" y="324" fill="#8297ab" font-size="10">no session Map · each POST is self-contained</text>
+        <text id="instBMeta" x="552" y="342" fill="#4d6276" font-size="11">_meta.protocolVersion + clientCapabilities</text>
+
+        <g id="bTool0">
+          <rect class="tBox" x="536" y="368" width="150" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="554" cy="386" r="4" fill="#2a3a4b"/>
+          <text x="566" y="390" fill="#e6edf3" font-size="11" font-weight="600">list_topics</text>
+          <text x="546" y="408" fill="#4d6276" font-size="10">topics</text>
+        </g>
+        <g id="bTool1">
+          <rect class="tBox" x="700" y="368" width="150" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="718" cy="386" r="4" fill="#2a3a4b"/>
+          <text x="730" y="390" fill="#e6edf3" font-size="11" font-weight="600">get_question</text>
+          <text x="710" y="408" fill="#4d6276" font-size="10">topicId</text>
+        </g>
+        <g id="bTool2">
+          <rect class="tBox" x="864" y="368" width="148" height="56" rx="10" fill="#16212d" stroke="#2a3a4b"/>
+          <circle class="tDot" cx="882" cy="386" r="4" fill="#2a3a4b"/>
+          <text x="894" y="390" fill="#e6edf3" font-size="11" font-weight="600">check_answer</text>
+          <text x="874" y="408" fill="#4d6276" font-size="10">validate</text>
+        </g>
+      </g>
+
+      <!-- struck session ghost over LB area when switching -->
+      <g id="sessionGhost" opacity="0">
+        <rect x="348" y="110" width="120" height="56" rx="10" fill="#121c28" stroke="#ff6b6b" stroke-dasharray="4 4" opacity=".7"/>
+        <text x="408" y="134" fill="#ff6b6b" font-size="10" text-anchor="middle" text-decoration="line-through">transports Map</text>
+        <text x="408" y="152" fill="#ff6b6b" font-size="9" text-anchor="middle">removed in 2026-07-28</text>
+      </g>
+    </g>
+
+    <g id="packet" opacity="0">
+      <rect id="pill" x="-90" y="-42" width="180" height="26" rx="13" fill="#16212d" stroke="#5cc8ff" stroke-width="1.6"/>
+      <text id="pillText" x="0" y="-24" fill="#5cc8ff" font-size="11" font-weight="500" text-anchor="middle"></text>
+      <circle id="dot" r="8" fill="#5cc8ff" filter="url(#glow)"/>
+    </g>
+
+    <g id="toast" opacity="0" transform="translate(540 52)">
+      <g id="toastInner">
+        <rect id="toastBg" x="-130" y="-22" width="260" height="44" rx="22" fill="#3ddc97" filter="url(#glow)"/>
+        <circle cx="-104" cy="0" r="12" fill="#0f1720"/>
+        <path d="M-109 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="toastText" x="10" y="5" fill="#0f1720" font-size="14" font-weight="600" text-anchor="middle">Quiz ready</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <span class="n" id="stepN">0</span>
+    <p id="stepText">Two boxes: Cursor (host) and Quiz MCP (server). Pick a protocol date above…</p>
+  </div>
+  <div class="rail" id="rail"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+
+  <div class="controls">
+    <button class="primary" id="play" type="button">Pause</button>
+    <button id="replay" type="button">Replay</button>
+    <div class="sound" role="group" aria-label="Sound">
+      Sound
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed" role="group" aria-label="Speed">Speed
+      <button type="button" data-s="0.5" aria-pressed="false">0.5×</button>
+      <button type="button" data-s="1" aria-pressed="true">1×</button>
+      <button type="button" data-s="1.5" aria-pressed="false">1.5×</button>
+    </div>
+  </div>
+
+  <section class="anatomy" aria-label="Before and after protocol comparison">
+    <h2>Headers &amp; steps — before / after</h2>
+    <div class="compare">
+      <article>
+        <h3 class="sess">2025-11-25 · sessions</h3>
+        <table>
+          <tr><th>Handshake</th><td><code>POST initialize</code> → create transport → store in <code>transports</code> Map</td></tr>
+          <tr><th>Session</th><td>Reply / later requests: <code>mcp-session-id</code></td></tr>
+          <tr><th>Stream</th><td><code>GET /mcp</code> opens SSE for that session</td></tr>
+          <tr><th>Tools</th><td><code>POST</code> <code>tools/list</code> / <code>tools/call</code> + session header</td></tr>
+          <tr><th>End</th><td><code>DELETE /mcp</code> closes transport, drops Map entry</td></tr>
+          <tr><th>Scaling</th><td>Sticky routing required — session lives on one process</td></tr>
+        </table>
+      </article>
+      <article>
+        <h3 class="stat">2026-07-28 · stateless</h3>
+        <table>
+          <tr><th>Handshake</th><td class="strike">initialize / session Map</td> — gone; each POST is complete</td></tr>
+          <tr><th>Headers</th><td><code>MCP-Protocol-Version: 2026-07-28</code>, <code>Mcp-Method</code>, <code>Mcp-Name</code></td></tr>
+          <tr><th>Body _meta</th><td><code>protocolVersion</code> + <code>clientCapabilities</code> on every call</td></tr>
+          <tr><th>Stream</th><td class="strike">GET SSE</td> — POST response itself may stream</td></tr>
+          <tr><th>Cache</th><td><code>tools/list</code> may carry a cache / ttl badge</td></tr>
+          <tr><th>Scaling</th><td>Any instance can serve any request — LB friendly</td></tr>
+        </table>
+      </article>
+    </div>
+  </section>
+
+  <section class="anatomy" aria-label="Static overview Cursor to MCP">
+    <h2>The same hop, at a glance</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 180" role="img" aria-label="Session path versus stateless path from Cursor to Quiz MCP">
+        <rect width="1080" height="180" fill="#16212d"/>
+        <!-- Session strip -->
+        <text x="40" y="28" fill="#5eead4" font-size="12" font-weight="600">2025-11-25</text>
+        <rect x="40" y="40" width="120" height="44" rx="10" fill="#0f1720" stroke="#5cc8ff"/>
+        <text x="100" y="67" fill="#5cc8ff" font-size="12" text-anchor="middle">Cursor</text>
+        <path class="pipe-flow" d="M160 62 H210" fill="none" stroke="#5cc8ff" stroke-width="1.6"/>
+        <rect x="210" y="40" width="130" height="44" rx="10" fill="#0f1720" stroke="#ffb547"/>
+        <text x="275" y="67" fill="#ffb547" font-size="11" text-anchor="middle">init + session</text>
+        <path class="pipe-flow" d="M340 62 H390" fill="none" stroke="#5eead4" stroke-width="1.6"/>
+        <rect x="390" y="40" width="110" height="44" rx="10" fill="#0f1720" stroke="#5eead4"/>
+        <text x="445" y="67" fill="#5eead4" font-size="11" text-anchor="middle">GET SSE</text>
+        <path class="pipe-flow" d="M500 62 H550" fill="none" stroke="#b18cff" stroke-width="1.6"/>
+        <rect x="550" y="40" width="160" height="44" rx="10" fill="#0f1720" stroke="#b18cff"/>
+        <text x="630" y="67" fill="#b18cff" font-size="11" text-anchor="middle">tools/call + id</text>
+        <path class="pipe-flow" d="M710 62 H760" fill="none" stroke="#ffb547" stroke-width="1.6"/>
+        <rect x="760" y="40" width="110" height="44" rx="10" fill="#0f1720" stroke="#ffb547"/>
+        <text x="815" y="67" fill="#ffb547" font-size="11" text-anchor="middle">DELETE</text>
+        <text x="940" y="67" fill="#4d6276" font-size="11">sticky host</text>
+
+        <!-- Stateless strip -->
+        <text x="40" y="118" fill="#3ddc97" font-size="12" font-weight="600">2026-07-28</text>
+        <rect x="40" y="130" width="120" height="44" rx="10" fill="#0f1720" stroke="#5cc8ff"/>
+        <text x="100" y="157" fill="#5cc8ff" font-size="12" text-anchor="middle">Cursor</text>
+        <path class="pipe-flow" d="M160 152 H210" fill="none" stroke="#5cc8ff" stroke-width="1.6"/>
+        <rect x="210" y="130" width="100" height="44" rx="10" fill="#0f1720" stroke="#ffb547"/>
+        <text x="260" y="157" fill="#ffb547" font-size="11" text-anchor="middle">LB</text>
+        <path class="pipe-flow" d="M310 152 H360" fill="none" stroke="#b18cff" stroke-width="1.6"/>
+        <rect x="360" y="130" width="200" height="44" rx="10" fill="#0f1720" stroke="#b18cff"/>
+        <text x="460" y="150" fill="#b18cff" font-size="11" text-anchor="middle">POST + headers</text>
+        <text x="460" y="166" fill="#4d6276" font-size="10" text-anchor="middle">Method · Name · Version</text>
+        <path class="pipe-flow" d="M560 152 H610" fill="none" stroke="#3ddc97" stroke-width="1.6"/>
+        <rect x="610" y="130" width="140" height="44" rx="10" fill="#0f1720" stroke="#3ddc97"/>
+        <text x="680" y="150" fill="#3ddc97" font-size="11" text-anchor="middle">A or B</text>
+        <text x="680" y="166" fill="#4d6276" font-size="10" text-anchor="middle">stream OK</text>
+        <text x="820" y="150" fill="#ff6b6b" font-size="11">no GET / DELETE</text>
+        <text x="820" y="166" fill="#4d6276" font-size="10">any replica works</text>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>Sessions stick</strong>Initialize creates a transport, stores a UUID in <code class="s">transports</code>, and every later verb carries <code>mcp-session-id</code>. GET keeps SSE open; DELETE tears it down.</p>
+      <p><strong>Stateless routes</strong>No Map. Headers <code>Mcp-Method</code> / <code>Mcp-Name</code> / <code>MCP-Protocol-Version</code> plus body <code>_meta</code> make each POST self-describing — LB can bounce between replicas.</p>
+      <p><strong>Same quiz tools</strong><code class="t">list_topics</code>, <code class="t">get_question</code>, <code class="o">check_answer</code> stay identical. Only the HTTP contract around them changed in 2026-07-28.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', LINE = '#2a3a4b', ERR = '#ff6b6b';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+  const mcpLeds = [...document.querySelectorAll('.mcpLed')];
+  const ledsA = [...document.querySelectorAll('.ledA')];
+  const ledsB = [...document.querySelectorAll('.ledB')];
+
+  const floaters = [
+    { id: 'client', amp: 2.4, speed: 0.2, phase: 0.2 },
+    { id: 'mcp', amp: 2.0, speed: 0.16, phase: 1.8 },
+    { id: 'instA', amp: 1.6, speed: 0.18, phase: 0.6 },
+    { id: 'instB', amp: 1.6, speed: 0.17, phase: 2.1 },
+    { id: 'lb', amp: 1.2, speed: 0.22, phase: 1.0 },
+  ];
+
+  /*
+   * PHASE ARRAYS — edit `txt` captions freely.
+   * Fields: k (key), d (seconds), step (rail 0–8), from/to [x,y],
+   * label (packet pill), c (colour), wire, txt (caption HTML), tone, inst (A|B for stateless).
+   */
+  const P_SESSION = [
+    { k:'idle', d:1.2, step:0, txt:'Two boxes: <strong>Cursor</strong> (host) and <strong>Quiz MCP</strong> (one server). Session handshake next…', tone:'rest' },
+    { k:'type', d:1.8, step:1, txt:'You type <code>“quiz me on MCP”</code>. Cursor’s agent will use tools from the MCP in <code>mcp.json</code>.', tone:'soft' },
+    { k:'toMcpInit', d:2.0, step:2, from:[316,160], to:[520,145], label:'POST initialize', c:REQ, wire:'post', txt:'Host → MCP: <code>POST /mcp</code> with initialize JSON-RPC. Express receives it on the same process.', tone:'whoosh' },
+    { k:'session', d:1.8, step:2, txt:'Inside MCP: create transport, <code>server.connect(transport)</code>, store UUID in <code class="s">transports</code>. Reply header: <code class="s">mcp-session-id</code>.', tone:'blip' },
+    { k:'sseOpen', d:2.0, step:3, from:[520,230], to:[316,230], label:'GET · SSE open', c:SSE, wire:'sse', txt:'Host opens <code class="s">GET /mcp</code> with that session id. Same process keeps an SSE channel for push.', tone:'whoosh' },
+    { k:'listTools', d:2.0, step:4, from:[316,160], to:[560,340], label:'tools/list', c:TOOL, wire:'post', txt:'Host → MCP: <code>POST</code> <code class="t">tools/list</code> + session header. Returns <code>list_topics</code>, <code>get_question</code>, <code>check_answer</code>.', tone:'whoosh' },
+    { k:'callList', d:2.1, step:5, from:[316,160], to:[610,340], label:'tools/call list_topics', c:TOOL, wire:'post', txt:'Agent calls <code class="t">list_topics</code>. Packet lands on the tool inside the MCP box — still the same server.', tone:'chime' },
+    { k:'callGet', d:2.1, step:5, from:[316,160], to:[770,340], label:'tools/call get_question', c:TOOL, wire:'post', txt:'Next: <code class="t">get_question({ topicId: "mcp" })</code> — again <code>POST /mcp</code> + <code class="s">mcp-session-id</code>.', tone:'whoosh' },
+    { k:'resultBack', d:2.0, step:6, from:[520,300], to:[316,300], label:'question JSON', c:OK, wire:'res', txt:'MCP → Host: structured tool result. May also stream on the open SSE line for the same session.', tone:'whoosh' },
+    { k:'askUser', d:1.8, step:6, txt:'Cursor shows the question. Your answer → agent calls <code class="o">check_answer</code> on the same session.', tone:'soft' },
+    { k:'check', d:2.0, step:7, from:[316,160], to:[930,340], label:'tools/call check_answer', c:OK, wire:'post', txt:'<code class="o">check_answer</code> runs in-process; feedback returns on the wire. Loop until the topic is done.', tone:'whoosh' },
+    { k:'delete', d:2.0, step:8, from:[316,380], to:[520,145], label:'DELETE /mcp', c:RES, wire:'del', txt:'Host ends the session: <code class="r">DELETE /mcp</code> with the session id. Transport closes; Map entry removed.', tone:'blip' },
+    { k:'done', d:2.8, step:8, txt:'Pattern: sticky <strong>session</strong> on one process. HTTP verbs + Map + tools = layers of one component — not three services.', tone:'resolve' },
+  ];
+
+  const P_STATELESS = [
+    { k:'idle', d:1.2, step:0, txt:'Stateless 2026-07-28: <strong>no initialize</strong>, no session Map, no GET, no DELETE. LB sits between Cursor and two identical Quiz MCP replicas.', tone:'rest' },
+    { k:'type', d:1.8, step:1, txt:'Same prompt <code>“quiz me on MCP”</code>. Host will POST with headers — not open a session.', tone:'soft' },
+    { k:'headers', d:2.0, step:2, txt:'Every request carries <code>MCP-Protocol-Version: 2026-07-28</code>, <code class="r">Mcp-Method</code>, and when needed <code class="t">Mcp-Name</code>. Body <code>_meta</code> holds <code>protocolVersion</code> + <code>clientCapabilities</code>.', tone:'blip' },
+    { k:'listTools', d:2.2, step:3, from:[316,250], to:[700,170], label:'POST tools/list → A', c:TOOL, wire:'lbA', inst:'A', txt:'LB routes <code class="t">tools/list</code> to <strong>Instance A</strong>. Headers: <code>Mcp-Method: tools/list</code>. No session id.', tone:'whoosh' },
+    { k:'cache', d:1.8, step:3, txt:'A replies with the tool list. Response may include a <code class="o">cache</code> / <code class="o">ttl</code> badge — list is cacheable across POSTs.', tone:'chime' },
+    { k:'callList', d:2.2, step:4, from:[316,250], to:[700,390], label:'list_topics → B', c:TOOL, wire:'lbB', inst:'B', txt:'Next POST lands on <strong>Instance B</strong>: <code>Mcp-Method: tools/call</code>, <code class="t">Mcp-Name: list_topics</code>. Different replica — still works.', tone:'whoosh' },
+    { k:'callGet', d:2.2, step:5, from:[316,250], to:[780,170], label:'get_question → A', c:TOOL, wire:'lbA', inst:'A', txt:'LB flips back to <strong>A</strong> for <code class="t">get_question</code>. Self-describing headers + <code>_meta</code> — no sticky session needed.', tone:'whoosh' },
+    { k:'stream', d:2.0, step:6, from:[700,200], to:[316,300], label:'streamed result', c:OK, wire:'res', inst:'A', txt:'POST response itself may <code class="o">stream</code> — <span class="strike" style="text-decoration:line-through;color:var(--err)">GET · SSE</span> is gone in 2026-07-28.', tone:'whoosh' },
+    { k:'askUser', d:1.6, step:6, txt:'Cursor shows the question. Answer → another stateless <code class="o">check_answer</code> POST (any instance).', tone:'soft' },
+    { k:'check', d:2.2, step:7, from:[316,250], to:[940,390], label:'check_answer → B', c:OK, wire:'lbB', inst:'B', txt:'<code class="o">check_answer</code> hits <strong>Instance B</strong>. Consecutive requests on different replicas — still correct.', tone:'whoosh' },
+    { k:'done', d:2.8, step:8, txt:'Stateless wins for scale: <strong>no sticky sessions</strong>. Initialize, Map, GET, and DELETE are <span style="text-decoration:line-through;color:#ff6b6b">removed in 2026-07-28</span>.', tone:'resolve' },
+  ];
+
+  let mode = 'session';
+  let P = P_SESSION;
+  let modeFade = 1; // 1 = fully session, 0 = fully stateless
+  let modeTarget = 1;
+  let switchFlash = 0; // shows removed labels briefly when entering stateless
+
+  const at = k => P.findIndex(p => p.k === k);
+  const totalOf = arr => arr.reduce((a, p) => a + p.d, 0);
+  let total = totalOf(P);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+
+  function lightToolGroup(prefix, i, on, color){
+    const g = $(prefix + i);
+    if (!g) return;
+    const box = g.querySelector('.tBox');
+    const dotEl = g.querySelector('.tDot');
+    if (box) setStroke(box, on ? color : LINE);
+    if (dotEl) dotEl.setAttribute('fill', on ? color : LINE);
+  }
+
+  function setVerb(id, on, color){
+    const g = $(id);
+    if (!g) return;
+    const box = g.querySelector('.vBox');
+    const label = g.querySelector('text');
+    if (box) setStroke(box, on ? color : LINE);
+    if (label) label.setAttribute('fill', on ? color : '#8297ab');
+  }
+
+  function setWire(which, on, color){
+    const map = {
+      post: ['wirePost', 'wirePostLbl'],
+      sse: ['wireSse', 'wireSseLbl'],
+      res: ['wireRes', 'wireResLbl'],
+      del: ['wireDel', 'wireDelLbl'],
+    };
+    const ids = map[which];
+    if (!ids) return;
+    const path = $(ids[0]), lbl = $(ids[1]);
+    if (!path) return;
+    path.setAttribute('stroke', on ? color : LINE);
+    path.setAttribute('opacity', on ? 1 : 0.45);
+    if (lbl) lbl.setAttribute('fill', on ? color : '#4d6276');
+  }
+
+  function setStatWire(which, on, color){
+    const ids = {
+      lbIn: 'wireLbIn',
+      lbA: 'wireLbA',
+      lbB: 'wireLbB',
+      res: 'wireStatRes',
+    };
+    const path = $(ids[which]);
+    if (!path) return;
+    path.setAttribute('stroke', on ? color : LINE);
+    path.setAttribute('opacity', on ? 1 : 0.45);
+  }
+
+  function applyModeVisibility(u){
+    // u: 1 = session, 0 = stateless
+    $('sessionMode').setAttribute('opacity', u);
+    $('sessionMode').style.pointerEvents = u > 0.5 ? 'auto' : 'none';
+    $('statelessMode').setAttribute('opacity', 1 - u);
+    $('statelessMode').style.pointerEvents = u < 0.5 ? 'auto' : 'none';
+
+    // Fade removed parts with strike labels when leaving session
+    const removed = 1 - u;
+    // Dim session-only verbs during transition
+    if (u < 1 && u > 0){
+      $('verbGet').setAttribute('opacity', Math.max(0.15, u));
+      $('verbDel').setAttribute('opacity', Math.max(0.15, u));
+      $('sessionLayer').setAttribute('opacity', Math.max(0.15, u * 0.85));
+      $('wireSse').setAttribute('opacity', Math.max(0.1, u * 0.45));
+      $('wireDel').setAttribute('opacity', Math.max(0.1, u * 0.35));
+    } else if (u >= 1){
+      $('verbGet').setAttribute('opacity', 1);
+      $('verbDel').setAttribute('opacity', 1);
+    }
+
+    const flash = Math.max(removed, switchFlash);
+    $('removedLabels').setAttribute('opacity', flash > 0.05 ? flash : 0);
+    $('sessionGhost').setAttribute('opacity', flash > 0.05 ? flash * 0.9 : 0);
+
+    $('cfgProto').textContent = u > 0.5 ? 'protocol: 2025-11-25' : 'protocol: 2026-07-28';
+    $('cfgProto').setAttribute('fill', u > 0.5 ? SSE : OK);
+  }
+
+  function setMode(next, animate){
+    if (next === mode && !animate) return;
+    const was = mode;
+    mode = next;
+    modeTarget = next === 'session' ? 1 : 0;
+    P = next === 'session' ? P_SESSION : P_STATELESS;
+    total = totalOf(P);
+    t = 0;
+    lastToneKey = null;
+    playing = true;
+    document.querySelectorAll('.mode-toggle button').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.mode === next);
+    });
+    if (next === 'stateless' && was === 'session'){
+      switchFlash = 1;
+    }
+    if (!animate || reduce){
+      modeFade = modeTarget;
+      switchFlash = next === 'stateless' ? 0.85 : 0;
+      applyModeVisibility(modeFade);
+    }
+    sync();
+    if (soundOn){ ensureAudio(); tone(next === 'stateless' ? 'blip' : 'soft'); }
+  }
+
+  function render(){
+    // Mode crossfade
+    if (!reduce){
+      modeFade += (modeTarget - modeFade) * 0.08;
+      if (Math.abs(modeFade - modeTarget) < 0.005) modeFade = modeTarget;
+      if (switchFlash > 0) switchFlash = Math.max(0, switchFlash - 0.012);
+    } else {
+      modeFade = modeTarget;
+    }
+    applyModeVisibility(modeFade);
+
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+    rail.forEach((r, i) => {
+      r.className = i < ph.step ? 'on' + (ph.k === 'done' ? ' done' : '') : '';
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const el = $(f.id);
+      if (!el) return;
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      el.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // Cursor chat
+    const typed = idx > at('type') ? 1 : (ph.k === 'type' ? local : 0);
+    const msg = 'quiz me on MCP';
+    $('userBubble').textContent = msg.slice(0, Math.max(1, Math.round(typed * msg.length)));
+
+    const clientHot = ['type','toMcpInit','headers','askUser','done'].includes(ph.k) || !!ph.wire;
+    setStroke($('clientFrame'), ph.k === 'done' ? OK : (clientHot || reached('type') ? REQ : LINE));
+
+    const agentActive = mode === 'session' ? reached('listTools') : reached('listTools');
+    $('agentCard').setAttribute('opacity', agentActive ? 1 : 0.55);
+    setStroke($('agentCard'), agentActive ? REQ : LINE);
+
+    const agentLabelsSess = {
+      listTools: ['listing tools…', 'tools/list'],
+      callList: ['calling list_topics', 'POST tools/call'],
+      callGet: ['calling get_question', 'topicId: mcp'],
+      resultBack: ['got question', 'showing to you'],
+      askUser: ['waiting for answer', 'then check_answer'],
+      check: ['calling check_answer', 'validate feedback'],
+      delete: ['ending session', 'DELETE /mcp'],
+      done: ['quiz loop done', 'session closed'],
+    };
+    const agentLabelsStat = {
+      headers: ['stateless headers', '2026-07-28'],
+      listTools: ['tools/list → A', 'no session id'],
+      cache: ['cached tool list', 'ttl badge'],
+      callList: ['list_topics → B', 'other replica'],
+      callGet: ['get_question → A', 'headers + _meta'],
+      stream: ['streamed result', 'POST response'],
+      askUser: ['waiting for answer', 'any instance'],
+      check: ['check_answer → B', 'still works'],
+      done: ['stateless quiz live', 'LB · A/B'],
+    };
+    const agentLabels = mode === 'session' ? agentLabelsSess : agentLabelsStat;
+    const al = agentLabels[ph.k] || (reached('askUser')
+      ? ['quiz in progress', 'Q ready']
+      : (reached('listTools') ? ['using MCP tools', ''] : ['idle', '']));
+    $('agentLine1').textContent = al[0];
+    $('agentLine1').setAttribute('fill', agentActive ? '#e6edf3' : '#4d6276');
+    $('agentLine2').textContent = al[1] || '';
+    $('agentLine2').setAttribute('fill', agentActive ? OK : '#4d6276');
+
+    if (mode === 'session' || modeFade > 0.4){
+      const mcpBusy = reached('toMcpInit');
+      mcpLeds.forEach((l, i) => l.setAttribute('fill', mcpBusy && Math.floor(t * 8 + i) % 3 === 0 ? TOOL : LINE));
+      setStroke($('mcpFrame'), ph.k === 'done' ? OK : (mcpBusy ? TOOL : LINE));
+
+      setStroke($('httpLayer'), reached('toMcpInit') ? RES : LINE);
+      setVerb('verbPost', ['toMcpInit','listTools','callList','callGet','check'].includes(ph.k) || ph.wire === 'post', REQ);
+      setVerb('verbGet', ['sseOpen','resultBack'].includes(ph.k) || (reached('sseOpen') && !reached('delete')), SSE);
+      setVerb('verbDel', ph.k === 'delete' || (ph.k === 'done' && reached('delete')), RES);
+
+      // Strike GET/DELETE visually when mid-fade to stateless
+      if (modeFade < 0.85 && modeTarget === 0){
+        const getTxt = $('verbGet').querySelector('text');
+        const delTxt = $('verbDel').querySelector('text');
+        if (getTxt){ getTxt.setAttribute('fill', ERR); getTxt.setAttribute('text-decoration', 'line-through'); }
+        if (delTxt){ delTxt.setAttribute('fill', ERR); delTxt.setAttribute('text-decoration', 'line-through'); }
+        setStroke($('sessionLayer'), ERR);
+      } else {
+        const getTxt = $('verbGet').querySelector('text');
+        const delTxt = $('verbDel').querySelector('text');
+        if (getTxt) getTxt.removeAttribute('text-decoration');
+        if (delTxt) delTxt.removeAttribute('text-decoration');
+      }
+
+      $('sessionLayer').setAttribute('opacity', modeFade < 1 ? Math.max(0.2, modeFade * (reached('session') ? 1 : 0.55)) : (reached('session') && !reached('delete') ? 1 : (reached('delete') ? 0.7 : 0.55)));
+      setStroke($('sessionLayer'), reached('session') ? (ph.k === 'delete' || ph.k === 'done' ? RES : SSE) : LINE);
+      if (reached('delete')){
+        $('sessionText').textContent = 'session closed · Map cleared';
+        $('sessionText').setAttribute('fill', RES);
+      } else {
+        $('sessionText').textContent = reached('session') ? 'mcp-session-id · a1b2…' : 'no session yet';
+        $('sessionText').setAttribute('fill', reached('session') ? SSE : '#4d6276');
+      }
+      $('sessionSub').setAttribute('fill', reached('session') ? '#8297ab' : '#4d6276');
+
+      $('toolsLayer').setAttribute('opacity', reached('listTools') ? 1 : 0.55);
+      setStroke($('toolsLayer'), reached('listTools') ? TOOL : LINE);
+
+      lightToolGroup('tool', 0, ph.k === 'callList' || (reached('callList') && ph.k !== 'callGet' && ph.k !== 'check'), TOOL);
+      lightToolGroup('tool', 1, ph.k === 'callGet' || reached('resultBack'), TOOL);
+      lightToolGroup('tool', 2, ph.k === 'check' || (reached('check') && (ph.k === 'delete' || ph.k === 'done')), OK);
+      if (reached('listTools') && !reached('callList')) {
+        lightToolGroup('tool', 0, true, TOOL);
+        lightToolGroup('tool', 1, true, TOOL);
+        lightToolGroup('tool', 2, true, TOOL);
+      }
+
+      setWire('post', ph.wire === 'post' || ['toMcpInit','listTools','callList','callGet','check'].includes(ph.k), REQ);
+      setWire('sse', ph.wire === 'sse' || (reached('sseOpen') && !reached('delete')), SSE);
+      setWire('res', ph.wire === 'res' || reached('resultBack'), OK);
+      setWire('del', ph.wire === 'del' || ph.k === 'delete', RES);
+
+      $('urlBadge').setAttribute('stroke', mcpBusy ? REQ : LINE);
+      $('urlText').setAttribute('fill', mcpBusy ? REQ : '#4d6276');
+      $('urlText').textContent = reached('delete') ? 'session ended' : (reached('session') ? 'session live' : ':3200/mcp');
+    }
+
+    if (mode === 'stateless' || modeFade < 0.6){
+      const hotA = ph.inst === 'A' || (reached('listTools') && !reached('callList'));
+      const hotB = ph.inst === 'B';
+      ledsA.forEach((l, i) => l.setAttribute('fill', hotA && Math.floor(t * 8 + i) % 3 === 0 ? TOOL : LINE));
+      ledsB.forEach((l, i) => l.setAttribute('fill', hotB && Math.floor(t * 8 + i) % 3 === 0 ? OK : LINE));
+      setStroke($('instAFrame'), ph.k === 'done' ? OK : (hotA ? TOOL : LINE));
+      setStroke($('instBFrame'), ph.k === 'done' ? OK : (hotB ? OK : LINE));
+      setStroke($('lbFrame'), !!ph.wire || reached('listTools') ? RES : LINE);
+      $('lbRoute').textContent = ph.inst === 'A' ? '→ Instance A' : ph.inst === 'B' ? '→ Instance B' : (reached('listTools') ? 'routing…' : 'idle');
+      $('lbRoute').setAttribute('fill', ph.inst ? REQ : '#4d6276');
+
+      setStroke($('instAHttp'), reached('listTools') ? RES : LINE);
+      setStroke($('instBHttp'), reached('callList') ? RES : LINE);
+      $('instAHdr').setAttribute('fill', reached('headers') ? REQ : '#4d6276');
+      $('instBMeta').setAttribute('fill', reached('headers') ? SSE : '#4d6276');
+
+      $('cacheBadge').setAttribute('opacity', reached('cache') ? 1 : 0);
+
+      // tools A
+      lightToolGroup('aTool', 0, ph.k === 'listTools' || ph.k === 'cache' || (reached('listTools') && ph.inst !== 'B' && ph.k !== 'callGet' && ph.k !== 'check'), TOOL);
+      lightToolGroup('aTool', 1, ph.k === 'callGet' || ph.k === 'stream', TOOL);
+      lightToolGroup('aTool', 2, false, OK);
+      if (reached('listTools') && !reached('callList') && ph.k !== 'callGet'){
+        lightToolGroup('aTool', 0, true, TOOL);
+        lightToolGroup('aTool', 1, true, TOOL);
+        lightToolGroup('aTool', 2, true, TOOL);
+      }
+      // tools B
+      lightToolGroup('bTool', 0, ph.k === 'callList', TOOL);
+      lightToolGroup('bTool', 1, false, TOOL);
+      lightToolGroup('bTool', 2, ph.k === 'check' || (reached('check') && ph.k === 'done'), OK);
+
+      setStatWire('lbIn', !!ph.from || ['listTools','callList','callGet','check'].includes(ph.k), REQ);
+      setStatWire('lbA', ph.wire === 'lbA' || ph.inst === 'A', REQ);
+      setStatWire('lbB', ph.wire === 'lbB' || ph.inst === 'B', OK);
+      setStatWire('res', ph.wire === 'res' || reached('stream'), OK);
+      $('wireStatResLbl').setAttribute('fill', reached('stream') ? OK : '#4d6276');
+    }
+
+    // Flying packet
+    if (ph.from){
+      const e = ease(local);
+      const x = lerp(ph.from[0], ph.to[0], e);
+      const y = lerp(ph.from[1], ph.to[1], e);
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(300, ph.label.length * 7.2 + 32);
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    if (ph.k === 'done'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = mode === 'session' ? 'Session closed · tools live' : 'Stateless · any replica';
+      toastText.textContent = label;
+      const w = label.length * 8.2 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('clientFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  document.querySelectorAll('.mode-toggle button').forEach(b => {
+    b.addEventListener('click', () => setMode(b.dataset.mode, true));
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  // Deep link: ?mode=stateless&at=listTools
+  const params = new URLSearchParams(location.search);
+  const modeParam = params.get('mode');
+  if (modeParam === 'stateless' || modeParam === 'session'){
+    setMode(modeParam, false);
+  }
+  const jump = params.get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  applyModeVisibility(modeFade);
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

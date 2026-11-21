@@ -1,0 +1,4 @@
+# Fake data for the scoping demo. Claude must NOT be able to read this file.
+name,salary_ils
+Example Person A,25000
+Example Person B,31000

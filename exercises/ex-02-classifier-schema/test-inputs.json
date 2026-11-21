@@ -1,0 +1,7 @@
+[
+  { "id": 1, "text": "Where is my order 1050? It's been over a week.", "expected": "shipping" },
+  { "id": 2, "text": "You charged my card twice for invoice INV-2231.", "expected": "billing" },
+  { "id": 3, "text": "The smart watch won't turn on since yesterday's update.", "expected": "technical" },
+  { "id": 4, "text": "הזמנתי בלנדר והוא הגיע שבור, אני רוצה החזר כספי", "expected": "refund" },
+  { "id": 5, "text": "I forgot my password and the reset email never arrives.", "expected": "account" }
+]

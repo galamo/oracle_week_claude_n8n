@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "demo-filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}/demo-4-connect-mcp-servers/demo-data"
+      ]
+    },
+    "ops-mcp": {
+      "url": "http://localhost:3200/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:MCP_TOKEN}"
+      }
+    }
+  }
+}

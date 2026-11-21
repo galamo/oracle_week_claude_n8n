@@ -1,0 +1,12 @@
+{
+  "name": "demo-4-connect-mcp-servers",
+  "version": "1.0.0",
+  "description": "Seminar Demo 4: connect an existing MCP server (filesystem, stdio) and our ops server (HTTP) to Claude Desktop, Cursor and Claude Code",
+  "private": true,
+  "scripts": {
+    "inspector:fs": "bash scripts/inspector-filesystem.sh",
+    "inspector:ops": "bash scripts/inspector-ops.sh",
+    "cursor:install": "bash scripts/install-cursor-config.sh",
+    "claude-code:add": "bash scripts/add-to-claude-code.sh"
+  }
+}

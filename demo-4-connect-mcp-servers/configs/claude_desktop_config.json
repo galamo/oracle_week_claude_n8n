@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "demo-filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/galamouy/dev-ai/oracle_week_/demo-4-connect-mcp-servers/demo-data"
+      ]
+    },
+    "ops-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:3200/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer PASTE_YOUR_MCP_TOKEN_HERE"
+      }
+    }
+  }
+}

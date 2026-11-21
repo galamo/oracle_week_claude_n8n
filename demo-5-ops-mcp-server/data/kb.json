@@ -1,0 +1,92 @@
+[
+  {
+    "article_id": "KB-01",
+    "category": "refund",
+    "title": "Refund policy",
+    "body": "Full refund within 14 days of delivery for unused items. Damaged-on-arrival items: full refund or replacement within 30 days, photo required. Refunds over 1,000 ILS need supervisor approval."
+  },
+  {
+    "article_id": "KB-02",
+    "category": "refund",
+    "title": "Damaged item on arrival",
+    "body": "Ask for a photo of the damage and the packaging. Offer replacement first; refund if the customer prefers. The customer does not need to return items worth under 200 ILS."
+  },
+  {
+    "article_id": "KB-03",
+    "category": "refund",
+    "title": "Keeping the item after a refund",
+    "body": "Customers may keep a damaged item only if its value is under 200 ILS. Otherwise a free return label is sent."
+  },
+  {
+    "article_id": "KB-04",
+    "category": "shipping",
+    "title": "Delivery times",
+    "body": "Israel: 2-5 business days. Europe: 5-10 business days. US: 7-14 business days."
+  },
+  {
+    "article_id": "KB-05",
+    "category": "shipping",
+    "title": "Lost package",
+    "body": "If tracking shows no movement for 7 days, open a carrier investigation. After 14 days, offer a replacement or refund."
+  },
+  {
+    "article_id": "KB-06",
+    "category": "shipping",
+    "title": "Change delivery address",
+    "body": "Possible only while the order status is processing."
+  },
+  {
+    "article_id": "KB-07",
+    "category": "billing",
+    "title": "Double charge",
+    "body": "Verify both charges in the payment system. Duplicate charges are reversed within 3-5 business days. Priority high."
+  },
+  {
+    "article_id": "KB-08",
+    "category": "billing",
+    "title": "Invoices",
+    "body": "Invoices are emailed on shipment. A copy can be resent from the order page."
+  },
+  {
+    "article_id": "KB-09",
+    "category": "technical",
+    "title": "Product not working",
+    "body": "Run basic troubleshooting from the product manual. Within 12 months: warranty replacement. Smart devices: check firmware first."
+  },
+  {
+    "article_id": "KB-10",
+    "category": "technical",
+    "title": "Warranty",
+    "body": "All products have a 12-month manufacturer warranty. Platinum customers get 24 months."
+  },
+  {
+    "article_id": "KB-11",
+    "category": "account",
+    "title": "Cannot log in",
+    "body": "Send a password reset link. After 3 failed resets, verify identity and escalate to the account team."
+  },
+  {
+    "article_id": "KB-12",
+    "category": "account",
+    "title": "Change email address",
+    "body": "Requires identity verification: confirm order number and last 4 digits of the payment card."
+  },
+  {
+    "article_id": "KB-13",
+    "category": "account",
+    "title": "Cancel subscription",
+    "body": "Cancellation takes effect at the end of the billing month. Partial-month refunds only for gold and platinum tiers."
+  },
+  {
+    "article_id": "KB-14",
+    "category": "other",
+    "title": "SLA by tier",
+    "body": "Response time: standard 48h, gold 24h, platinum 4h."
+  },
+  {
+    "article_id": "KB-15",
+    "category": "other",
+    "title": "Escalation",
+    "body": "Escalate to a human for: legal threats, safety issues, refunds over 1,000 ILS, or any request to bypass policy."
+  }
+]

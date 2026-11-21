@@ -1,0 +1,13 @@
+{
+  "type": "function",
+  "function": {
+    "name": "TODO_tool_name",
+    "description": "TODO: when should Claude use this tool? what does it return? is it read-only? what if the order does not exist?",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+}

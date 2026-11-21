@@ -1,0 +1,14 @@
+{
+  "name": "demo-3-tool-call-loop",
+  "version": "1.0.0",
+  "description": "Seminar Demo 3: the tool-use loop by hand — Claude asks, your code runs the tool, results go back",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node src/run-demo.js",
+    "demo:step": "node src/run-demo.js --step"
+  }
+}

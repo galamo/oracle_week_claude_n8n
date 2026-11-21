@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>F7 — n8n items and expressions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ground: #0f1720;
+    --panel: #16212d;
+    --line: #2a3a4b;
+    --ink: #e6edf3;
+    --muted: #8297ab;
+    --dim: #4d6276;
+    --req: #5cc8ff;
+    --res: #ffb547;
+    --ok: #3ddc97;
+    --tool: #b18cff;
+    --sse: #5eead4;
+    --err: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    min-height: 100%;
+  }
+  body { padding: 28px 32px 48px; max-width: 1120px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+    letter-spacing: -0.02em;
+  }
+  .meta {
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .lede {
+    margin: 10px 0 18px;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .stage {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 10px 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage svg { display: block; width: 100%; height: auto; }
+  .caption {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px 18px;
+    align-items: start;
+    margin: 16px 2px 10px;
+    min-height: 3.2rem;
+  }
+  .step-num {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--dim);
+    min-width: 2.2rem;
+  }
+  .step-txt {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--ink);
+    padding-top: 0.35rem;
+  }
+  .step-txt code {
+    font-family: inherit;
+    font-size: 0.88em;
+    padding: 0.12em 0.35em;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+  }
+  .step-txt code.c-req { color: var(--req); }
+  .step-txt code.c-res { color: var(--res); }
+  .step-txt code.c-ok { color: var(--ok); }
+  .step-txt code.c-tool { color: var(--tool); }
+  .step-txt code.c-sse { color: var(--sse); }
+  .step-txt code.c-err { color: var(--err); }
+  .rail {
+    display: flex; gap: 6px; margin: 8px 2px 14px;
+  }
+  .rail i {
+    flex: 1; height: 4px; border-radius: 2px;
+    background: var(--line);
+    transition: background 0.25s ease, opacity 0.25s ease;
+  }
+  .rail i.on { background: var(--sse); }
+  .rail i.done { background: var(--dim); }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .controls button {
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .controls button:hover { border-color: var(--muted); }
+  .controls button:focus-visible {
+    outline: 2px solid var(--req);
+    outline-offset: 2px;
+  }
+  .controls button.active {
+    border-color: var(--sse);
+    color: var(--sse);
+  }
+  .speed-group { display: flex; gap: 4px; margin-left: 4px; }
+  .speed-group span {
+    font-size: 0.68rem;
+    color: var(--dim);
+    align-self: center;
+    margin-right: 2px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .glance {
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+  .glance h2 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .glance-svg {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+  .glance-svg svg { display: block; width: 100%; height: auto; }
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .note {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 14px 16px;
+  }
+  .note strong {
+    display: block;
+    font-size: 0.88rem;
+    margin-bottom: 8px;
+    color: var(--ink);
+  }
+  .note p {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  @media (max-width: 560px) {
+    body { padding: 18px 14px 36px; }
+    .notes { grid-template-columns: 1fr; }
+    .caption { grid-template-columns: 1fr; gap: 4px; }
+    .step-num { font-size: 1.6rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail i { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>How data moves through n8n</h1>
+    <p class="meta">F7 · M4 · Items &amp; expressions</p>
+  </header>
+  <p class="lede">Every node runs once per item. Expressions resolve against the current item — or an earlier node.</p>
+
+  <div class="stage">
+    <svg id="stage" viewBox="0 0 1080 560" role="img" aria-label="n8n canvas: Webhook to Edit Fields to HTTP Request to Switch to Data Table, with three items flowing through expressions">
+      <defs>
+        <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+          <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#1c2836" stroke-width="1"/>
+        </pattern>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="1080" height="560" fill="url(#grid)" opacity="0.55"/>
+
+      <!-- Wires -->
+      <g id="wires" fill="none" stroke-linecap="round">
+        <path id="w1" d="M170 250 H240" stroke="var(--line)" stroke-width="2.5"/>
+        <path id="w2" d="M380 250 H450" stroke="var(--line)" stroke-width="2.5"/>
+        <path id="w3" d="M590 250 H660" stroke="var(--line)" stroke-width="2.5"/>
+        <path id="w4a" d="M800 230 C830 230 840 160 870 160" stroke="var(--line)" stroke-width="2"/>
+        <path id="w4b" d="M800 250 H870" stroke="var(--line)" stroke-width="2"/>
+        <path id="w4c" d="M800 270 C830 270 840 340 870 340" stroke="var(--line)" stroke-width="2"/>
+      </g>
+
+      <!-- Nodes (n8n-style rounded boxes) -->
+      <g id="nodes">
+        <g class="node" id="n-webhook" data-drift="0">
+          <rect x="40" y="210" width="130" height="80" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="2"/>
+          <circle cx="62" cy="232" r="8" fill="none" stroke="var(--req)" stroke-width="2"/>
+          <text x="78" y="236" fill="var(--muted)" font-size="10">Webhook</text>
+          <text x="62" y="262" fill="var(--ink)" font-size="12" font-weight="600">POST /triage</text>
+          <text x="62" y="278" fill="var(--dim)" font-size="9">trigger</text>
+        </g>
+        <g class="node" id="n-edit" data-drift="1">
+          <rect x="240" y="210" width="140" height="80" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="2"/>
+          <circle cx="262" cy="232" r="8" fill="none" stroke="var(--tool)" stroke-width="2"/>
+          <text x="278" y="236" fill="var(--muted)" font-size="10">Edit Fields</text>
+          <text x="262" y="262" fill="var(--ink)" font-size="12" font-weight="600">Map → prompt</text>
+          <text x="262" y="278" fill="var(--dim)" font-size="9">Set / expressions</text>
+        </g>
+        <g class="node" id="n-http" data-drift="2">
+          <rect x="450" y="210" width="140" height="80" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="2"/>
+          <circle cx="472" cy="232" r="8" fill="none" stroke="var(--res)" stroke-width="2"/>
+          <text x="488" y="236" fill="var(--muted)" font-size="10">HTTP Request</text>
+          <text x="472" y="262" fill="var(--ink)" font-size="12" font-weight="600">Claude API</text>
+          <text x="472" y="278" fill="var(--dim)" font-size="9">once per item</text>
+        </g>
+        <g class="node" id="n-switch" data-drift="3">
+          <rect x="660" y="210" width="140" height="80" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="2"/>
+          <circle cx="682" cy="232" r="8" fill="none" stroke="var(--sse)" stroke-width="2"/>
+          <text x="698" y="236" fill="var(--muted)" font-size="10">Switch</text>
+          <text x="682" y="262" fill="var(--ink)" font-size="12" font-weight="600">by category</text>
+          <text x="682" y="278" fill="var(--dim)" font-size="9">3 outputs</text>
+        </g>
+        <g class="node" id="n-table" data-drift="4">
+          <rect x="870" y="120" width="160" height="56" rx="10" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="890" y="144" fill="var(--ok)" font-size="11" font-weight="600">refund</text>
+          <text x="890" y="160" fill="var(--dim)" font-size="9">Data Table · out 0</text>
+          <rect x="870" y="222" width="160" height="56" rx="10" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="890" y="246" fill="var(--req)" font-size="11" font-weight="600">shipping</text>
+          <text x="890" y="262" fill="var(--dim)" font-size="9">Data Table · out 1</text>
+          <rect x="870" y="310" width="160" height="56" rx="10" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="890" y="334" fill="var(--res)" font-size="11" font-weight="600">other</text>
+          <text x="890" y="350" fill="var(--dim)" font-size="9">Data Table · out 2</text>
+        </g>
+      </g>
+
+      <!-- Incoming array badge -->
+      <g id="arrayBadge" opacity="0">
+        <rect x="36" y="120" width="148" height="72" rx="8" fill="#0c131b" stroke="var(--req)" stroke-width="1.5"/>
+        <text x="48" y="142" fill="var(--req)" font-size="10" font-weight="600">body[] · 3 requests</text>
+        <text x="48" y="160" fill="var(--muted)" font-size="9">[{text, category},</text>
+        <text x="48" y="174" fill="var(--muted)" font-size="9"> {text, category},</text>
+        <text x="48" y="188" fill="var(--muted)" font-size="9"> {text}]</text>
+      </g>
+
+      <!-- Item cards (deck of 3) -->
+      <g id="items">
+        <g class="item" id="item2" transform="translate(70,395)" opacity="0">
+          <rect width="88" height="52" rx="7" fill="#0c131b" stroke="var(--dim)" stroke-width="1.5"/>
+          <text x="10" y="18" fill="var(--dim)" font-size="8">item[2]</text>
+          <text x="10" y="34" fill="var(--ink)" font-size="9">invoice?</text>
+          <text x="10" y="46" fill="var(--res)" font-size="8">other</text>
+        </g>
+        <g class="item" id="item1" transform="translate(62,388)" opacity="0">
+          <rect width="88" height="52" rx="7" fill="#0c131b" stroke="var(--dim)" stroke-width="1.5"/>
+          <text x="10" y="18" fill="var(--dim)" font-size="8">item[1]</text>
+          <text x="10" y="34" fill="var(--ink)" font-size="9">where is…</text>
+          <text x="10" y="46" fill="var(--req)" font-size="8">shipping</text>
+        </g>
+        <g class="item" id="item0" transform="translate(54,381)" opacity="0">
+          <rect width="88" height="52" rx="7" fill="#0c131b" stroke="var(--ok)" stroke-width="1.5"/>
+          <text x="10" y="18" fill="var(--dim)" font-size="8">item[0]</text>
+          <text x="10" y="34" fill="var(--ink)" font-size="9">refund pls</text>
+          <text x="10" y="46" fill="var(--ok)" font-size="8">refund</text>
+        </g>
+      </g>
+
+      <!-- HTTP call counter -->
+      <g id="httpCounter" opacity="0">
+        <rect x="468" y="160" width="104" height="28" rx="8" fill="#0c131b" stroke="var(--res)" stroke-width="1.5"/>
+        <text id="httpCountTxt" x="520" y="178" text-anchor="middle" fill="var(--res)" font-size="12" font-weight="600">call 0 / 3</text>
+      </g>
+
+      <!-- Expression editor overlay (zoom) -->
+      <g id="exprPanel" opacity="0" pointer-events="none">
+        <rect x="200" y="70" width="680" height="200" rx="14" fill="#0a1018" stroke="var(--tool)" stroke-width="2" filter="url(#softGlow)"/>
+        <text x="220" y="98" fill="var(--tool)" font-size="11" font-weight="600" letter-spacing="0.12em">EXPRESSION EDITOR · Edit Fields</text>
+        <text x="220" y="128" fill="var(--muted)" font-size="11">Name: prompt</text>
+        <rect x="220" y="140" width="640" height="44" rx="8" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+        <text id="exprSrc" x="236" y="168" fill="var(--ink)" font-size="15" font-family="IBM Plex Mono, monospace">{{ $json.body.text }}</text>
+        <text x="220" y="214" fill="var(--dim)" font-size="11">resolves →</text>
+        <text id="exprVal" x="300" y="214" fill="var(--ok)" font-size="14" font-weight="600">…</text>
+      </g>
+
+      <!-- Missing-field / nullish panel -->
+      <g id="nullPanel" opacity="0" pointer-events="none">
+        <rect x="220" y="400" width="640" height="120" rx="12" fill="#0a1018" stroke="var(--err)" stroke-width="1.5"/>
+        <text id="nullTitle" x="240" y="430" fill="var(--err)" font-size="12" font-weight="600">item[2] · missing email</text>
+        <text id="nullExpr" x="240" y="458" fill="var(--ink)" font-size="14">{{ $json.body.email }}</text>
+        <text id="nullResult" x="240" y="490" fill="var(--err)" font-size="13" font-weight="600">→ undefined</text>
+      </g>
+
+      <!-- Cross-node ref callout -->
+      <g id="refPanel" opacity="0" pointer-events="none">
+        <rect x="240" y="40" width="600" height="56" rx="10" fill="#0a1018" stroke="var(--sse)" stroke-width="1.5"/>
+        <text x="260" y="64" fill="var(--sse)" font-size="11" font-weight="600">cross-node</text>
+        <text x="260" y="82" fill="var(--ink)" font-size="13">{{ $('Webhook').item.json.body.text }}</text>
+      </g>
+
+      <!-- Flying packet -->
+      <g id="packet" opacity="0" filter="url(#glow)">
+        <circle id="pktDot" cx="0" cy="0" r="7" fill="var(--req)"/>
+        <rect id="pktPill" x="12" y="-14" width="90" height="28" rx="14" fill="#0c131b" stroke="var(--req)" stroke-width="1.5"/>
+        <text id="pktLabel" x="57" y="5" text-anchor="middle" fill="var(--ink)" font-size="11" font-weight="500">item</text>
+      </g>
+
+      <!-- Success toast -->
+      <g id="toast" opacity="0">
+        <rect x="340" y="480" width="400" height="44" rx="12" fill="#0c131b" stroke="var(--ok)" stroke-width="2"/>
+        <text x="540" y="508" text-anchor="middle" fill="var(--ok)" font-size="14" font-weight="600">Every node runs once per item.</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="caption">
+    <div class="step-num" id="stepNum">01</div>
+    <div class="step-txt" id="stepTxt" aria-live="polite">Webhook receives a JSON array of three support requests.</div>
+  </div>
+  <div class="rail" id="rail" aria-hidden="true"></div>
+  <div class="controls">
+    <button type="button" id="btnPause" aria-pressed="false">Pause</button>
+    <button type="button" id="btnReplay">Replay</button>
+    <button type="button" id="btnSound" aria-pressed="false">Sound Off</button>
+    <div class="speed-group">
+      <span>Speed</span>
+      <button type="button" data-speed="0.5">0.5x</button>
+      <button type="button" data-speed="1" class="active">1x</button>
+      <button type="button" data-speed="1.5">1.5x</button>
+    </div>
+  </div>
+
+  <section class="glance">
+    <h2>At a glance</h2>
+    <div class="glance-svg">
+      <svg viewBox="0 0 1080 200" role="img" aria-label="Static diagram: item structure and three common expressions">
+        <rect x="24" y="28" width="280" height="144" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="44" y="56" fill="var(--ok)" font-size="13" font-weight="600">Item structure</text>
+        <text x="44" y="88" fill="var(--ink)" font-size="14">{ json, binary }</text>
+        <text x="44" y="116" fill="var(--muted)" font-size="11">json — fields your nodes read</text>
+        <text x="44" y="138" fill="var(--muted)" font-size="11">binary — files / attachments</text>
+        <text x="44" y="158" fill="var(--dim)" font-size="10">Array of items = node input</text>
+
+        <rect x="332" y="28" width="724" height="144" rx="12" fill="#121c27" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="352" y="56" fill="var(--tool)" font-size="13" font-weight="600">3 most-used expressions</text>
+        <text x="352" y="90" fill="var(--req)" font-size="13">{{ $json.body.text }}</text>
+        <text x="620" y="90" fill="var(--muted)" font-size="11">current item field</text>
+        <text x="352" y="122" fill="var(--sse)" font-size="13">{{ $('Webhook').item.json }}</text>
+        <text x="700" y="122" fill="var(--muted)" font-size="11">earlier node</text>
+        <text x="352" y="154" fill="var(--ok)" font-size="13">{{ $json.email ?? 'n/a' }}</text>
+        <text x="680" y="154" fill="var(--muted)" font-size="11">nullish default</text>
+      </svg>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <strong>Items, not rows</strong>
+        <p>A node input is always an array of items. Each item is <code>{ json, binary }</code>. The node executes once for every item.</p>
+      </div>
+      <div class="note">
+        <strong>$json vs $('Node')</strong>
+        <p><code>$json</code> is the current item. <code>$('Webhook').item.json</code> reads the paired item from an earlier node in the same run.</p>
+      </div>
+      <div class="note">
+        <strong>Guard missing fields</strong>
+        <p>Unresolved paths become <code>undefined</code>. Prefer <code>?? 'n/a'</code> (or IF) so Switch / HTTP never see empty values by accident.</p>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── Phase array — edit captions (txt) freely ─────────────────────────
+     k: key for ?at=   d: duration (s)   step: caption number
+     from/to: packet [x,y]   label: pill text   c: CSS colour var
+     wire: wire id to light   tone: whoosh|blip|chime|soft|resolve|rest
+     vis: optional UI flags applied at phase start
+  ─────────────────────────────────────────────────────────────────────── */
+  const P = [
+    // 1 — Webhook receives array of 3 requests
+    {
+      k: "recv", d: 2.6, step: 1,
+      from: [20, 156], to: [105, 250],
+      label: "POST[]", c: "var(--req)", wire: "w1",
+      txt: "Webhook receives a JSON array of <code class=\"c-req\">3</code> support requests in <code class=\"c-req\">body[]</code>.",
+      tone: "whoosh",
+      vis: { array: 1, items: 0, expr: 0, nullp: 0, ref: 0, http: 0, toast: 0, lit: ["n-webhook"] }
+    },
+    // 2 — Splits into 3 items (deck)
+    {
+      k: "split", d: 2.8, step: 2,
+      from: [105, 250], to: [98, 405],
+      label: "3 items", c: "var(--ok)", wire: null,
+      txt: "n8n splits the array into <code class=\"c-ok\">3 items</code> — each <code class=\"c-ok\">{ json }</code> is one execution unit.",
+      tone: "blip",
+      vis: { array: 0.35, items: 1, lit: ["n-webhook"] }
+    },
+    // 3 — Edit Fields maps body.text → prompt
+    {
+      k: "edit", d: 2.5, step: 3,
+      from: [140, 405], to: [310, 250],
+      label: "item[0]", c: "var(--tool)", wire: "w1",
+      txt: "Edit Fields maps <code class=\"c-tool\">body.text</code> → <code class=\"c-tool\">prompt</code> with an expression.",
+      tone: "soft",
+      vis: { items: 1, lit: ["n-webhook", "n-edit"] }
+    },
+    // 4 — Zoom: expression resolves live
+    {
+      k: "expr", d: 3.6, step: 4,
+      from: [310, 250], to: [310, 250],
+      label: "$json", c: "var(--tool)", wire: null,
+      txt: "<code class=\"c-tool\">{{ $json.body.text }}</code> resolves live to <code class=\"c-ok\">\"refund pls\"</code> for the current item.",
+      tone: "chime",
+      vis: { expr: 1, exprVal: '"refund pls"', lit: ["n-edit"] }
+    },
+    // 5a — HTTP Request call 1/3
+    {
+      k: "http1", d: 1.7, step: 5,
+      from: [380, 250], to: [520, 250],
+      label: "call 1", c: "var(--res)", wire: "w2",
+      txt: "HTTP Request (Claude) runs <code class=\"c-res\">once per item</code> — call <code class=\"c-res\">1 / 3</code>.",
+      tone: "whoosh",
+      vis: { expr: 0, http: 1, httpN: 1, lit: ["n-edit", "n-http"] }
+    },
+    // 5b — call 2/3
+    {
+      k: "http2", d: 1.5, step: 5,
+      from: [380, 250], to: [520, 250],
+      label: "call 2", c: "var(--res)", wire: "w2",
+      txt: "Same node, next item — call <code class=\"c-res\">2 / 3</code>. Claude returns <code class=\"c-ok\">category</code> JSON.",
+      tone: "blip",
+      vis: { http: 1, httpN: 2, lit: ["n-http"] }
+    },
+    // 5c — call 3/3
+    {
+      k: "http3", d: 1.5, step: 5,
+      from: [380, 250], to: [520, 250],
+      label: "call 3", c: "var(--res)", wire: "w2",
+      txt: "Third item — call <code class=\"c-res\">3 / 3</code>. Three items in → three Claude requests out.",
+      tone: "blip",
+      vis: { http: 1, httpN: 3, lit: ["n-http"] }
+    },
+    // 6 — Switch by category
+    {
+      k: "switch", d: 3.0, step: 6,
+      from: [590, 250], to: [730, 250],
+      label: "route", c: "var(--sse)", wire: "w3",
+      txt: "Switch routes by <code class=\"c-sse\">{{ $json.category }}</code> → refund / shipping / other outputs.",
+      tone: "chime",
+      vis: { http: 0.4, lit: ["n-http", "n-switch", "n-table"], wiresOut: 1 }
+    },
+    // 7 — Missing field → undefined
+    {
+      k: "undef", d: 3.2, step: 7,
+      from: [730, 250], to: [540, 460],
+      label: "item[2]", c: "var(--err)", wire: null,
+      txt: "Item 2 has no email — <code class=\"c-err\">{{ $json.body.email }}</code> resolves to <code class=\"c-err\">undefined</code>.",
+      tone: "soft",
+      vis: {
+        nullp: 1,
+        nullTitle: "item[2] · missing email",
+        nullExpr: "{{ $json.body.email }}",
+        nullResult: "→ undefined",
+        nullStroke: "var(--err)",
+        lit: ["n-edit"]
+      }
+    },
+    // 8 — Fix with ?? 'n/a'
+    {
+      k: "nullish", d: 3.0, step: 8,
+      from: [540, 460], to: [540, 460],
+      label: "??", c: "var(--ok)", wire: null,
+      txt: "Fix: <code class=\"c-ok\">{{ $json.body.email ?? 'n/a' }}</code> → <code class=\"c-ok\">\"n/a\"</code>. Safe for downstream nodes.",
+      tone: "resolve",
+      vis: {
+        nullp: 1,
+        nullTitle: "item[2] · nullish coalescing",
+        nullExpr: "{{ $json.body.email ?? 'n/a' }}",
+        nullResult: '→ "n/a"',
+        nullStroke: "var(--ok)",
+        lit: ["n-edit"]
+      }
+    },
+    // 9 — Cross-node reference
+    {
+      k: "ref", d: 3.2, step: 9,
+      from: [105, 250], to: [310, 250],
+      label: "$('…')", c: "var(--sse)", wire: "w1",
+      txt: "Need the original payload? <code class=\"c-sse\">{{ $('Webhook').item.json.body.text }}</code> reads an earlier node.",
+      tone: "chime",
+      vis: { nullp: 0, ref: 1, lit: ["n-webhook", "n-edit"] }
+    },
+    // 10 — Final
+    {
+      k: "done", d: 3.8, step: 10,
+      from: [950, 250], to: [950, 250],
+      label: "done", c: "var(--ok)", wire: null,
+      txt: "<code class=\"c-ok\">Every node runs once per item.</code> Design mappings and branches with that mental model.",
+      tone: "resolve",
+      vis: { ref: 0, toast: 1, items: 1, lit: ["n-webhook", "n-edit", "n-http", "n-switch", "n-table"], wiresOut: 1 }
+    }
+  ];
+
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const params = new URLSearchParams(location.search);
+  const atKey = params.get("at");
+  const freezeIdx = atKey ? Math.max(0, P.findIndex(p => p.k === atKey)) : -1;
+  const frozen = freezeIdx >= 0 || reduced;
+
+  // DOM
+  const svg = document.getElementById("stage");
+  const packet = document.getElementById("packet");
+  const pktDot = document.getElementById("pktDot");
+  const pktPill = document.getElementById("pktPill");
+  const pktLabel = document.getElementById("pktLabel");
+  const stepNum = document.getElementById("stepNum");
+  const stepTxt = document.getElementById("stepTxt");
+  const railEl = document.getElementById("rail");
+  const btnPause = document.getElementById("btnPause");
+  const btnReplay = document.getElementById("btnReplay");
+  const btnSound = document.getElementById("btnSound");
+  const arrayBadge = document.getElementById("arrayBadge");
+  const itemsG = document.getElementById("items");
+  const exprPanel = document.getElementById("exprPanel");
+  const exprVal = document.getElementById("exprVal");
+  const nullPanel = document.getElementById("nullPanel");
+  const nullTitle = document.getElementById("nullTitle");
+  const nullExpr = document.getElementById("nullExpr");
+  const nullResult = document.getElementById("nullResult");
+  const refPanel = document.getElementById("refPanel");
+  const httpCounter = document.getElementById("httpCounter");
+  const httpCountTxt = document.getElementById("httpCountTxt");
+  const toast = document.getElementById("toast");
+  const nodeIds = ["n-webhook", "n-edit", "n-http", "n-switch", "n-table"];
+  const wireIds = ["w1", "w2", "w3", "w4a", "w4b", "w4c"];
+
+  // Rail segments = unique step numbers
+  const stepKeys = [...new Set(P.map(p => p.step))];
+  stepKeys.forEach(() => {
+    const i = document.createElement("i");
+    railEl.appendChild(i);
+  });
+  const railSegs = [...railEl.children];
+
+  // State
+  let speed = 1;
+  let paused = frozen;
+  let soundOn = false;
+  let phase = frozen ? (reduced ? P.length - 1 : freezeIdx) : 0;
+  let t0 = null;
+  let elapsed = 0;
+  let lastTs = null;
+  let tonePlayed = false;
+  let raf = null;
+
+  // WebAudio
+  let actx = null, master = null;
+  function unlockAudio() {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain();
+      master.gain.value = 0.07;
+      master.connect(actx.destination);
+    }
+    if (actx.state === "suspended") actx.resume();
+  }
+  function tone(kind) {
+    if (!soundOn || reduced || !actx || !master) return;
+    const now = actx.currentTime;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.connect(g); g.connect(master);
+    const map = {
+      whoosh:  { type: "sine", f0: 180, f1: 420, a: 0.001, s: 0.08, r: 0.22 },
+      blip:    { type: "triangle", f0: 660, f1: 880, a: 0.001, s: 0.05, r: 0.12 },
+      chime:   { type: "sine", f0: 523, f1: 784, a: 0.002, s: 0.12, r: 0.28 },
+      soft:    { type: "sine", f0: 320, f1: 280, a: 0.01, s: 0.1, r: 0.2 },
+      resolve: { type: "triangle", f0: 392, f1: 587, a: 0.002, s: 0.15, r: 0.35 },
+      rest:    { type: "sine", f0: 200, f1: 160, a: 0.01, s: 0.05, r: 0.15 }
+    };
+    const m = map[kind] || map.blip;
+    o.type = m.type;
+    o.frequency.setValueAtTime(m.f0, now);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, m.f1), now + m.s + m.r);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.9, now + m.a);
+    g.gain.exponentialRampToValueAtTime(0.001, now + m.a + m.s + m.r);
+    o.start(now); o.stop(now + m.a + m.s + m.r + 0.02);
+  }
+
+  function easeInOutCubic(x) {
+    return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  }
+
+  function setOpacity(el, v) {
+    if (!el) return;
+    el.setAttribute("opacity", String(Math.max(0, Math.min(1, v))));
+  }
+
+  function lightNode(id, on, color) {
+    const g = document.getElementById(id);
+    if (!g) return;
+    const rects = g.querySelectorAll("rect");
+    rects.forEach((r, idx) => {
+      if (on) {
+        r.setAttribute("stroke", color || "var(--sse)");
+        r.setAttribute("stroke-width", id === "n-table" ? "2" : "2.5");
+        r.setAttribute("opacity", "1");
+      } else {
+        r.setAttribute("stroke", "var(--line)");
+        r.setAttribute("stroke-width", id === "n-table" ? (idx === 0 ? "1.5" : "1.5") : "2");
+        r.setAttribute("opacity", "1");
+      }
+    });
+  }
+
+  function lightWire(id, on, color) {
+    if (!id) return;
+    const w = document.getElementById(id);
+    if (!w) return;
+    w.setAttribute("stroke", on ? (color || "var(--sse)") : "var(--line)");
+    w.setAttribute("stroke-width", on ? "3" : (id.startsWith("w4") ? "2" : "2.5"));
+    if (on) w.setAttribute("filter", "url(#softGlow)");
+    else w.removeAttribute("filter");
+  }
+
+  function placePacket(x, y, label, color, show) {
+    setOpacity(packet, show ? 1 : 0);
+    packet.setAttribute("transform", `translate(${x},${y})`);
+    pktLabel.textContent = label;
+    const w = Math.max(70, label.length * 7.5 + 24);
+    pktPill.setAttribute("width", w);
+    pktLabel.setAttribute("x", 12 + w / 2);
+    pktDot.setAttribute("fill", color);
+    pktPill.setAttribute("stroke", color);
+  }
+
+  function applyVis(vis) {
+    if (!vis) return;
+    if (vis.array != null) setOpacity(arrayBadge, vis.array);
+    if (vis.items != null) setOpacity(itemsG, vis.items);
+    if (vis.expr != null) setOpacity(exprPanel, vis.expr);
+    if (vis.exprVal != null) exprVal.textContent = vis.exprVal;
+    if (vis.nullp != null) setOpacity(nullPanel, vis.nullp);
+    if (vis.nullTitle) nullTitle.textContent = vis.nullTitle;
+    if (vis.nullExpr) nullExpr.textContent = vis.nullExpr;
+    if (vis.nullResult) {
+      nullResult.textContent = vis.nullResult;
+      nullResult.setAttribute("fill", vis.nullStroke === "var(--ok)" ? "var(--ok)" : "var(--err)");
+    }
+    if (vis.nullStroke) {
+      nullPanel.querySelector("rect").setAttribute("stroke", vis.nullStroke);
+      nullTitle.setAttribute("fill", vis.nullStroke);
+    }
+    if (vis.ref != null) setOpacity(refPanel, vis.ref);
+    if (vis.http != null) setOpacity(httpCounter, vis.http);
+    if (vis.httpN != null) httpCountTxt.textContent = `call ${vis.httpN} / 3`;
+    if (vis.toast != null) setOpacity(toast, vis.toast);
+
+    nodeIds.forEach(id => lightNode(id, false));
+    wireIds.forEach(id => lightWire(id, false));
+    const lit = vis.lit || [];
+    const colorMap = {
+      "n-webhook": "var(--req)",
+      "n-edit": "var(--tool)",
+      "n-http": "var(--res)",
+      "n-switch": "var(--sse)",
+      "n-table": "var(--ok)"
+    };
+    lit.forEach(id => lightNode(id, true, colorMap[id]));
+    if (vis.wiresOut) {
+      lightWire("w4a", true, "var(--ok)");
+      lightWire("w4b", true, "var(--req)");
+      lightWire("w4c", true, "var(--res)");
+    }
+  }
+
+  function showPhase(i, u) {
+    const p = P[i];
+    const e = easeInOutCubic(Math.min(1, Math.max(0, u)));
+    const x = p.from[0] + (p.to[0] - p.from[0]) * e;
+    const y = p.from[1] + (p.to[1] - p.from[1]) * e;
+    const moving = p.from[0] !== p.to[0] || p.from[1] !== p.to[1];
+    placePacket(x, y, p.label, p.c, moving || u < 0.95);
+
+    stepNum.textContent = String(p.step).padStart(2, "0");
+    stepTxt.innerHTML = p.txt;
+
+    // Rail: mark by step index
+    const si = stepKeys.indexOf(p.step);
+    railSegs.forEach((el, idx) => {
+      el.classList.remove("on", "done");
+      if (idx < si) el.classList.add("done");
+      else if (idx === si) el.classList.add("on");
+    });
+
+    applyVis(p.vis || {});
+    if (p.wire) lightWire(p.wire, true, p.c);
+
+    if (!tonePlayed && u > 0.02) {
+      tone(p.tone || "blip");
+      tonePlayed = true;
+    }
+  }
+
+  // Gentle floating drift on main boxes
+  function drift(ts) {
+    if (reduced) return;
+    const t = ts * 0.001;
+    nodeIds.slice(0, 4).forEach((id, i) => {
+      const g = document.getElementById(id);
+      const dy = Math.sin(t * 0.7 + i * 1.1) * 2.2;
+      const dx = Math.cos(t * 0.5 + i * 0.8) * 1.2;
+      g.setAttribute("transform", `translate(${dx},${dy})`);
+    });
+  }
+
+  function tick(ts) {
+    drift(ts);
+    if (!paused) {
+      if (lastTs == null) lastTs = ts;
+      elapsed += (ts - lastTs) * speed / 1000;
+      lastTs = ts;
+
+      const p = P[phase];
+      let u = elapsed / p.d;
+      if (u >= 1) {
+        elapsed = 0;
+        tonePlayed = false;
+        phase = (phase + 1) % P.length;
+        u = 0;
+      }
+      showPhase(phase, u);
+    } else {
+      lastTs = ts;
+      showPhase(phase, frozen && atKey ? 1 : Math.min(1, elapsed / (P[phase].d || 1)));
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function jumpTo(i, u) {
+    phase = i;
+    elapsed = (P[i].d || 1) * (u == null ? 1 : u);
+    tonePlayed = true;
+    showPhase(phase, u == null ? 1 : u);
+  }
+
+  // Controls
+  btnPause.addEventListener("click", () => {
+    if (frozen && atKey) return;
+    paused = !paused;
+    btnPause.textContent = paused ? "Play" : "Pause";
+    btnPause.setAttribute("aria-pressed", String(paused));
+    lastTs = null;
+  });
+  btnReplay.addEventListener("click", () => {
+    if (atKey) {
+      jumpTo(freezeIdx, 1);
+      return;
+    }
+    phase = 0;
+    elapsed = 0;
+    tonePlayed = false;
+    paused = false;
+    btnPause.textContent = "Pause";
+    btnPause.setAttribute("aria-pressed", "false");
+    lastTs = null;
+    showPhase(0, 0);
+  });
+  btnSound.addEventListener("click", () => {
+    if (reduced) return;
+    unlockAudio();
+    soundOn = !soundOn;
+    btnSound.textContent = soundOn ? "Sound On" : "Sound Off";
+    btnSound.setAttribute("aria-pressed", String(soundOn));
+    btnSound.classList.toggle("active", soundOn);
+  });
+  document.querySelectorAll("[data-speed]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      speed = parseFloat(btn.dataset.speed);
+      document.querySelectorAll("[data-speed]").forEach(b => b.classList.toggle("active", b === btn));
+    });
+  });
+
+  window.addEventListener("pointerdown", () => {
+    if (soundOn) unlockAudio();
+  }, { once: false });
+
+  // Init
+  if (reduced) {
+    jumpTo(P.length - 1, 1);
+    paused = true;
+    btnPause.textContent = "Play";
+    btnSound.textContent = "Sound Off";
+  } else if (atKey && freezeIdx >= 0) {
+    jumpTo(freezeIdx, 1);
+    paused = true;
+    btnPause.textContent = "Play";
+  } else {
+    showPhase(0, 0);
+  }
+
+  raf = requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

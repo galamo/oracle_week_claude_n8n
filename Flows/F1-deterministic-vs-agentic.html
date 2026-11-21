@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 — Deterministic vs Agentic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(92,200,255,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(177,140,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--req)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+.caption code.e{color:var(--err)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>F1 — <em>Deterministic</em> vs Agentic</h1>
+    <span class="meta">same request · two automations</span>
+  </header>
+  <p class="lede">One ticket, two routers: an n8n <code>Switch</code> with hard-coded keyword rules vs Claude classifying intent and calling tools. Messy input breaks rules; clean input makes rules win on cost and latency.</p>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 640" role="img" aria-label="Split view: deterministic n8n Switch on top, agentic Claude classifier with tools below">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+      <marker id="arrowErr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/>
+      </marker>
+      <marker id="arrowTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b18cff"/>
+      </marker>
+      <marker id="arrowRes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ffb547"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="640" fill="url(#grid)"/>
+
+    <!-- ========== TOP LANE: DETERMINISTIC ========== -->
+    <g id="laneTop" transform="translate(0 0)">
+      <rect id="topFrame" x="28" y="24" width="1024" height="268" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M28 40a18 18 0 0 1 18-16h988a18 18 0 0 1 18 16v22H28z" fill="#1d2a38"/>
+      <circle cx="54" cy="36" r="4" fill="#ffb547"/>
+      <text x="72" y="40" fill="#8297ab" font-size="12">DETERMINISTIC · n8n Switch · 4 keyword rules</text>
+      <text id="topBadgeCost" x="980" y="40" fill="#4d6276" font-size="11" text-anchor="end"></text>
+
+      <!-- Inbox -->
+      <rect id="topInbox" x="48" y="90" width="200" height="100" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="64" y="114" fill="#8297ab" font-size="10">INBOX</text>
+      <text id="topMsg1" x="64" y="138" fill="#4d6276" font-size="11">waiting…</text>
+      <text id="topMsg2" x="64" y="156" fill="#4d6276" font-size="11"></text>
+      <text id="topMsg3" x="64" y="174" fill="#4d6276" font-size="11"></text>
+
+      <!-- Wire inbox → switch -->
+      <path id="wireTopIn" d="M248 140 H300" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowRes)" opacity=".45"/>
+
+      <!-- Switch -->
+      <rect id="switchBox" x="300" y="78" width="280" height="174" rx="14" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="316" y="102" fill="#8297ab" font-size="10">SWITCH · contains()</text>
+      <g id="rule0">
+        <rect class="rBox" x="316" y="114" width="248" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="330" y="132" fill="#8297ab" font-size="12">1 · refund / money / return</text>
+      </g>
+      <g id="rule1">
+        <rect class="rBox" x="316" y="148" width="248" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="330" y="166" fill="#8297ab" font-size="12">2 · shipping / package / track</text>
+      </g>
+      <g id="rule2">
+        <rect class="rBox" x="316" y="182" width="248" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="330" y="200" fill="#8297ab" font-size="12">3 · invoice / receipt / bill</text>
+      </g>
+      <g id="rule3">
+        <rect class="rBox" x="316" y="216" width="248" height="28" rx="8" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="330" y="234" fill="#8297ab" font-size="12">4 · other → manual queue</text>
+      </g>
+
+      <!-- Wire switch → outcomes -->
+      <path id="wireTopOut" d="M580 165 H630" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+
+      <!-- Outcomes -->
+      <rect id="outRefund" x="630" y="78" width="190" height="40" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="outRefundLbl" x="725" y="103" fill="#4d6276" font-size="12" text-anchor="middle">→ refund</text>
+      <rect id="outShip" x="630" y="128" width="190" height="40" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="outShipLbl" x="725" y="153" fill="#4d6276" font-size="12" text-anchor="middle">→ shipping</text>
+      <rect id="outInv" x="630" y="178" width="190" height="40" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="outInvLbl" x="725" y="203" fill="#4d6276" font-size="12" text-anchor="middle">→ invoice</text>
+      <rect id="outOther" x="630" y="228" width="190" height="40" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="outOtherLbl" x="725" y="253" fill="#4d6276" font-size="12" text-anchor="middle">→ other / queue</text>
+
+      <!-- Manual queue badge -->
+      <rect id="manualQueue" x="840" y="218" width="190" height="60" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+      <text id="manualLbl" x="935" y="244" fill="#4d6276" font-size="12" text-anchor="middle" font-weight="600">MANUAL QUEUE</text>
+      <text id="manualSub" x="935" y="264" fill="#4d6276" font-size="10" text-anchor="middle">human triage</text>
+
+      <!-- Latency / cost badges (top) -->
+      <g id="topMetrics" opacity="0">
+        <rect x="840" y="90" width="190" height="56" rx="10" fill="#121c28" stroke="#3ddc97"/>
+        <text x="935" y="114" fill="#3ddc97" font-size="13" text-anchor="middle" font-weight="600">$0 · ~2 ms</text>
+        <text x="935" y="132" fill="#8297ab" font-size="10" text-anchor="middle">rules · zero tokens</text>
+      </g>
+    </g>
+
+    <!-- ========== BOTTOM LANE: AGENTIC ========== -->
+    <g id="laneBot" transform="translate(0 0)">
+      <rect id="botFrame" x="28" y="312" width="1024" height="268" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M28 328a18 18 0 0 1 18-16h988a18 18 0 0 1 18 16v22H28z" fill="#1d2a38"/>
+      <circle cx="54" cy="324" r="4" fill="#5cc8ff"/>
+      <text x="72" y="328" fill="#8297ab" font-size="12">AGENTIC · Claude classifier + tools</text>
+      <text id="botBadgeCost" x="980" y="328" fill="#4d6276" font-size="11" text-anchor="end"></text>
+
+      <!-- Inbox -->
+      <rect id="botInbox" x="48" y="378" width="200" height="100" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="64" y="402" fill="#8297ab" font-size="10">INBOX</text>
+      <text id="botMsg1" x="64" y="426" fill="#4d6276" font-size="11">waiting…</text>
+      <text id="botMsg2" x="64" y="444" fill="#4d6276" font-size="11"></text>
+      <text id="botMsg3" x="64" y="462" fill="#4d6276" font-size="11"></text>
+
+      <path id="wireBotIn" d="M248 428 H300" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+
+      <!-- Claude -->
+      <rect id="claudeBox" x="300" y="366" width="280" height="150" rx="14" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="316" y="390" fill="#8297ab" font-size="10">CLAUDE · structured output</text>
+      <text id="claudeLine1" x="316" y="418" fill="#4d6276" font-size="12">idle</text>
+      <text id="claudeLine2" x="316" y="440" fill="#4d6276" font-size="11"></text>
+      <text id="claudeLine3" x="316" y="460" fill="#4d6276" font-size="11"></text>
+      <text id="claudeLine4" x="316" y="480" fill="#4d6276" font-size="11"></text>
+      <text id="claudeLine5" x="316" y="500" fill="#4d6276" font-size="11"></text>
+
+      <path id="wireBotMid" d="M580 440 H630" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowTool)" opacity=".45"/>
+
+      <!-- Tool -->
+      <rect id="toolBox" x="630" y="378" width="170" height="88" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="715" y="410" fill="#4d6276" font-size="11" text-anchor="middle">TOOL</text>
+      <text id="toolName" x="715" y="434" fill="#4d6276" font-size="13" text-anchor="middle" font-weight="600">get_order</text>
+      <text id="toolSub" x="715" y="452" fill="#4d6276" font-size="10" text-anchor="middle">MCP / HTTP</text>
+
+      <path id="wireBotOut" d="M800 422 H840" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+
+      <!-- Result -->
+      <rect id="agentResult" x="840" y="378" width="190" height="88" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+      <text id="agentResTitle" x="935" y="412" fill="#4d6276" font-size="12" text-anchor="middle" font-weight="600">REFUND BRANCH</text>
+      <text id="agentResSub" x="935" y="436" fill="#4d6276" font-size="11" text-anchor="middle">awaiting route</text>
+
+      <!-- Latency / cost badges (bot) -->
+      <g id="botMetrics" opacity="0">
+        <rect x="840" y="486" width="190" height="56" rx="10" fill="#121c28" stroke="#ffb547"/>
+        <text x="935" y="510" fill="#ffb547" font-size="13" text-anchor="middle" font-weight="600">~$0.002 · ~800 ms</text>
+        <text x="935" y="528" fill="#8297ab" font-size="10" text-anchor="middle">tokens · model call</text>
+      </g>
+
+      <!-- Shipping success for simple request (agent) -->
+      <rect id="agentShip" x="840" y="478" width="190" height="40" rx="10" fill="#121c28" stroke="#2a3a4b" opacity="0"/>
+      <text id="agentShipLbl" x="935" y="503" fill="#4d6276" font-size="12" text-anchor="middle">→ shipping · ok</text>
+    </g>
+
+    <!-- Flying packet -->
+    <g id="packet" opacity="0" filter="url(#glow)">
+      <rect id="pill" x="-60" y="-16" width="120" height="28" rx="14" fill="#121c28" stroke="#5cc8ff" stroke-width="1.5"/>
+      <text id="pillText" x="0" y="4" fill="#5cc8ff" font-size="11" text-anchor="middle">packet</text>
+      <circle id="dot" cx="0" cy="22" r="5" fill="#5cc8ff"/>
+    </g>
+
+    <!-- Success toast -->
+    <g id="toast" opacity="0" transform="translate(540 300)">
+      <g id="toastInner">
+        <rect id="toastBg" x="-180" y="-22" width="360" height="44" rx="22" fill="#121c28" stroke="#3ddc97" stroke-width="1.5"/>
+        <circle cx="-154" cy="0" r="10" fill="none" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M-159 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2" stroke-linecap="round"/>
+        <text id="toastText" x="14" y="5" fill="#3ddc97" font-size="13" text-anchor="middle" font-weight="600">Use agents where inputs are messy</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <span class="n" id="stepN">1</span>
+    <p id="stepText">Same request enters both lanes…</p>
+  </div>
+
+  <div class="rail" id="rail" aria-hidden="true">
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="primary" id="play">Pause</button>
+    <button type="button" id="replay">Replay</button>
+    <div class="sound">
+      <span>Sound</span>
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed">
+      <span>Speed</span>
+      <button type="button" data-s="0.5">0.5x</button>
+      <button type="button" data-s="1" aria-pressed="true">1x</button>
+      <button type="button" data-s="1.5">1.5x</button>
+    </div>
+  </div>
+
+  <section class="anatomy">
+    <h2>At a glance — autonomy spectrum</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 180" role="img" aria-label="Five-level spectrum from plain workflow to autonomous agent, levels 2 to 4 highlighted">
+        <rect width="1080" height="180" fill="#16212d"/>
+        <!-- Level 1 -->
+        <rect x="28" y="36" width="180" height="88" rx="12" fill="#0f1720" stroke="#2a3a4b" stroke-width="1.5" opacity=".55"/>
+        <text x="118" y="72" fill="#4d6276" font-size="13" text-anchor="middle" font-weight="600">1 · Plain workflow</text>
+        <text x="118" y="96" fill="#4d6276" font-size="11" text-anchor="middle">fixed steps only</text>
+        <!-- Level 2 highlighted -->
+        <rect x="232" y="36" width="180" height="88" rx="12" fill="#0f1720" stroke="#ffb547" stroke-width="2"/>
+        <text x="322" y="72" fill="#ffb547" font-size="13" text-anchor="middle" font-weight="600">2 · Rules / Switch</text>
+        <text x="322" y="96" fill="#8297ab" font-size="11" text-anchor="middle">keyword branches</text>
+        <!-- Level 3 highlighted -->
+        <rect x="436" y="36" width="180" height="88" rx="12" fill="#0f1720" stroke="#5cc8ff" stroke-width="2"/>
+        <text x="526" y="72" fill="#5cc8ff" font-size="13" text-anchor="middle" font-weight="600">3 · LLM + Switch</text>
+        <text x="526" y="96" fill="#8297ab" font-size="11" text-anchor="middle">JSON → routes</text>
+        <!-- Level 4 highlighted -->
+        <rect x="640" y="36" width="180" height="88" rx="12" fill="#0f1720" stroke="#b18cff" stroke-width="2"/>
+        <text x="730" y="72" fill="#b18cff" font-size="13" text-anchor="middle" font-weight="600">4 · Agent + tools</text>
+        <text x="730" y="96" fill="#8297ab" font-size="11" text-anchor="middle">classify · call · act</text>
+        <!-- Level 5 -->
+        <rect x="844" y="36" width="208" height="88" rx="12" fill="#0f1720" stroke="#2a3a4b" stroke-width="1.5" opacity=".55"/>
+        <text x="948" y="72" fill="#4d6276" font-size="13" text-anchor="middle" font-weight="600">5 · Autonomous</text>
+        <text x="948" y="96" fill="#4d6276" font-size="11" text-anchor="middle">multi-step loops</text>
+        <!-- Connectors -->
+        <path class="pipe-flow" d="M208 80 H232" fill="none" stroke="#2a3a4b" stroke-width="1.5"/>
+        <path class="pipe-flow" d="M412 80 H436" fill="none" stroke="#ffb547" stroke-width="1.5"/>
+        <path class="pipe-flow" d="M616 80 H640" fill="none" stroke="#5cc8ff" stroke-width="1.5"/>
+        <path class="pipe-flow" d="M820 80 H844" fill="none" stroke="#b18cff" stroke-width="1.5"/>
+        <text x="540" y="156" fill="#8297ab" font-size="12" text-anchor="middle">Seminar focus: levels 2–4 — rules where clean, agents where messy</text>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>Rules are brittle on mixed intent</strong>Keyword <code>contains("refund")</code> also sees “package” and “box”. First-match order or fallback to <code class="e">other</code> sends humans a ticket the model would have routed.</p>
+      <p><strong>Claude returns a contract</strong>Structured JSON <code>{category, sub, confidence}</code> feeds the same Switch — plus a tool call like <code class="t">get_order</code> when context is needed before acting.</p>
+      <p><strong>Pick by input messiness</strong>Simple tracking queries: rules win ($0, milliseconds). Damaged + keep-box refunds: agents earn their ~$0.002 and latency.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', ERR = '#ff6b6b', LINE = '#2a3a4b', MUTED = '#8297ab', DIM = '#4d6276', INK = '#e6edf3';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+
+  const floaters = [
+    { id: 'laneTop', amp: 2.0, speed: 0.18, phase: 0.3 },
+    { id: 'laneBot', amp: 1.8, speed: 0.15, phase: 1.6 },
+  ];
+
+  /*
+   * Phase array P — edit `txt` captions freely for the talk.
+   * Keep `k` keys stable: slides deep-link with ?at=<k>
+   * step maps to the 8-segment progress rail (1..8).
+   * tone: whoosh | blip | chime | soft | resolve | rest
+   */
+  const P = [
+    // 1 — messy request lands in both inboxes
+    { k:'arrive', d:2.4, step:1, from:[148,140], to:[148,428], label:'same request', c:REQ, wire:'split',
+      txt:'Messy ticket hits both lanes: <code>“my package came broken, I want my money back but keep the box?”</code>',
+      tone:'whoosh' },
+
+    // 2 — deterministic scans refund rule
+    { k:'rulesTry', d:2.2, step:2, from:[248,140], to:[440,128], label:'try rule 1 · refund', c:RES, wire:'topIn',
+      txt:'Top lane: Switch tests keyword rule 1 (<code class="r">refund / money / return</code>). Mixed intent also mentions package + keep the box.',
+      tone:'blip' },
+
+    // 3 — fail → other → manual queue
+    { k:'rulesFail', d:2.4, step:3, from:[580,230], to:[935,248], label:'→ other / queue', c:ERR, wire:'topOut',
+      txt:'Match is ambiguous — falls through to <code class="e">other</code> and lands in the <strong style="color:var(--err)">manual queue</strong>. Rules stop here.',
+      tone:'soft' },
+
+    // 4 — Claude classifies to JSON
+    { k:'claudeJson', d:2.6, step:4, from:[248,428], to:[440,440], label:'classify → JSON', c:REQ, wire:'botIn',
+      txt:'Bottom lane: Claude returns <code>{category:"refund", sub:"damaged_item", confidence:0.91}</code> — a contract the Switch can trust.',
+      tone:'chime' },
+
+    // 5 — tool call then green refund
+    { k:'toolCall', d:2.0, step:5, from:[580,440], to:[715,422], label:'tools/call get_order', c:TOOL, wire:'botMid',
+      txt:'Agent calls <code class="t">get_order</code> for context, then routes to the refund branch.',
+      tone:'whoosh' },
+    { k:'agentOk', d:2.2, step:5, from:[800,422], to:[935,422], label:'refund · ok', c:OK, wire:'botOut',
+      txt:'Green result: <code class="o">refund</code> with order context. Same messy ticket the rules parked for a human.',
+      tone:'blip' },
+
+    // 6 — simple request arrives
+    { k:'simpleArrive', d:2.2, step:6, from:[148,140], to:[148,428], label:'simple request', c:SSE, wire:'split',
+      txt:'Second ticket is clean: <code class="s">“where is order 1042?”</code> — both lanes should succeed.',
+      tone:'whoosh' },
+
+    // 7 — both succeed; show cost / latency
+    { k:'rulesWin', d:2.0, step:7, from:[248,140], to:[725,153], label:'→ shipping · $0', c:OK, wire:'topIn',
+      txt:'Rules match <code class="o">shipping / track</code> instantly. Cost badge <code class="o">$0</code>, latency ~2&nbsp;ms.',
+      tone:'blip' },
+    { k:'bothWin', d:2.4, step:7, from:[248,428], to:[935,503], label:'shipping · ~$0.002', c:RES, wire:'botIn',
+      txt:'Agent also routes to shipping — correct, but slower and paid: <code class="r">~$0.002</code> · ~800&nbsp;ms. Rules win on clean input.',
+      tone:'chime' },
+
+    // 8 — teaching point
+    { k:'lesson', d:3.2, step:8,
+      txt:'<strong>Use agents where inputs are messy; keep rules where they are not.</strong> Autonomy is a spectrum — pick the cheapest reliable layer.',
+      tone:'resolve' },
+  ];
+
+  const at = k => P.findIndex(p => p.k === k);
+  const total = P.reduce((a, p) => a + p.d, 0);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+  function setFill(el, color){ if (el) el.setAttribute('fill', color); }
+  function setOp(el, o){ if (el) el.setAttribute('opacity', o); }
+
+  function lightRule(i, on, color){
+    const g = $('rule' + i);
+    if (!g) return;
+    const box = g.querySelector('.rBox');
+    const label = g.querySelector('text');
+    setStroke(box, on ? color : LINE);
+    setFill(label, on ? color : MUTED);
+  }
+
+  function setWire(id, on, color){
+    const path = $(id);
+    if (!path) return;
+    path.setAttribute('stroke', on ? color : LINE);
+    path.setAttribute('opacity', on ? 1 : 0.45);
+  }
+
+  function setMsg(prefix, lines, hot){
+    for (let i = 1; i <= 3; i++){
+      const el = $(prefix + 'Msg' + i);
+      const text = lines[i - 1] || '';
+      el.textContent = text;
+      setFill(el, hot && text ? INK : DIM);
+    }
+  }
+
+  function render(){
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+    rail.forEach((r, i) => {
+      const n = i + 1;
+      r.className = n < ph.step ? 'on' + (ph.k === 'lesson' ? ' done' : '')
+        : (n === ph.step ? 'on' + (ph.k === 'lesson' ? ' done' : '') : '');
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      $(f.id).setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // --- Messages ---
+    const messy = ['“package broken…', 'money back but', 'keep the box?”'];
+    const simple = ['“where is', 'order 1042?”', ''];
+    const afterSimple = reached('simpleArrive');
+    const lines = afterSimple ? simple : (reached('arrive') ? messy : ['waiting…', '', '']);
+    const inboxHot = reached('arrive');
+    setMsg('top', lines, inboxHot);
+    setMsg('bot', lines, inboxHot);
+    setStroke($('topInbox'), inboxHot ? (afterSimple ? SSE : REQ) : LINE);
+    setStroke($('botInbox'), inboxHot ? (afterSimple ? SSE : REQ) : LINE);
+
+    // --- Frames ---
+    const topHot = ['rulesTry','rulesFail','rulesWin'].includes(ph.k) || (reached('arrive') && !reached('claudeJson'));
+    const botHot = ['claudeJson','toolCall','agentOk','bothWin'].includes(ph.k) || reached('claudeJson');
+    setStroke($('topFrame'), ph.k === 'lesson' ? OK : (reached('rulesFail') && !reached('simpleArrive') ? ERR : (topHot || reached('arrive') ? RES : LINE)));
+    setStroke($('botFrame'), ph.k === 'lesson' ? OK : (reached('agentOk') ? OK : (botHot ? REQ : LINE)));
+
+    // --- Switch / rules ---
+    setStroke($('switchBox'), reached('rulesTry') ? RES : LINE);
+    lightRule(0, ph.k === 'rulesTry' || (reached('rulesTry') && !reached('rulesFail') && !reached('simpleArrive')), RES);
+    lightRule(1, ph.k === 'rulesWin' || (reached('rulesWin') && afterSimple), OK);
+    lightRule(2, false, LINE);
+    lightRule(3, ph.k === 'rulesFail' || (reached('rulesFail') && !reached('simpleArrive')), ERR);
+    if (reached('rulesTry') && !reached('rulesFail') && ph.k !== 'rulesTry') {
+      // briefly show all rules scanned
+    }
+    if (afterSimple && reached('rulesWin')) {
+      lightRule(0, false, LINE);
+      lightRule(3, false, LINE);
+      lightRule(1, true, OK);
+    }
+
+    // Outcomes
+    const failActive = reached('rulesFail') && !afterSimple;
+    setStroke($('outOther'), failActive ? ERR : LINE);
+    setFill($('outOtherLbl'), failActive ? ERR : DIM);
+    setOp($('manualQueue'), failActive ? 1 : 0.55);
+    setStroke($('manualQueue'), failActive ? ERR : LINE);
+    setFill($('manualLbl'), failActive ? ERR : DIM);
+    setFill($('manualSub'), failActive ? MUTED : DIM);
+    if (failActive) {
+      $('manualSub').textContent = 'mixed intent stuck';
+    } else {
+      $('manualSub').textContent = 'human triage';
+    }
+
+    const shipRule = afterSimple && reached('rulesWin');
+    setStroke($('outShip'), shipRule ? OK : LINE);
+    setFill($('outShipLbl'), shipRule ? OK : DIM);
+    setStroke($('outRefund'), LINE);
+    setFill($('outRefundLbl'), DIM);
+    setStroke($('outInv'), LINE);
+    setFill($('outInvLbl'), DIM);
+
+    // Metrics top
+    setOp($('topMetrics'), afterSimple && reached('rulesWin') ? 1 : 0);
+
+    // --- Claude ---
+    setStroke($('claudeBox'), reached('claudeJson') ? REQ : LINE);
+    if (ph.k === 'claudeJson' || (reached('claudeJson') && !afterSimple)) {
+      $('claudeLine1').textContent = '{';
+      $('claudeLine2').textContent = '  category: "refund",';
+      $('claudeLine3').textContent = '  sub: "damaged_item",';
+      $('claudeLine4').textContent = '  confidence: 0.91';
+      $('claudeLine5').textContent = '}';
+      [1,2,3,4,5].forEach(i => setFill($('claudeLine' + i), INK));
+      setFill($('claudeLine2'), OK);
+      setFill($('claudeLine4'), SSE);
+    } else if (afterSimple && reached('bothWin')) {
+      $('claudeLine1').textContent = '{';
+      $('claudeLine2').textContent = '  category: "shipping",';
+      $('claudeLine3').textContent = '  sub: "track_order",';
+      $('claudeLine4').textContent = '  confidence: 0.97';
+      $('claudeLine5').textContent = '}';
+      [1,2,3,4,5].forEach(i => setFill($('claudeLine' + i), INK));
+      setFill($('claudeLine2'), OK);
+    } else if (reached('simpleArrive') && !reached('bothWin')) {
+      $('claudeLine1').textContent = 'reading…';
+      $('claudeLine2').textContent = '';
+      $('claudeLine3').textContent = '';
+      $('claudeLine4').textContent = '';
+      $('claudeLine5').textContent = '';
+      setFill($('claudeLine1'), REQ);
+    } else {
+      $('claudeLine1').textContent = 'idle';
+      $('claudeLine2').textContent = '';
+      $('claudeLine3').textContent = '';
+      $('claudeLine4').textContent = '';
+      $('claudeLine5').textContent = '';
+      setFill($('claudeLine1'), DIM);
+    }
+
+    // Tool
+    const toolHot = ph.k === 'toolCall' || (reached('toolCall') && !afterSimple);
+    setStroke($('toolBox'), toolHot || (reached('agentOk') && !afterSimple) ? TOOL : LINE);
+    setFill($('toolName'), toolHot || (reached('agentOk') && !afterSimple) ? TOOL : DIM);
+    setFill($('toolSub'), toolHot ? MUTED : DIM);
+    $('toolSub').textContent = toolHot ? 'calling…' : 'MCP / HTTP';
+
+    // Agent result
+    const agentOk = reached('agentOk') && !afterSimple;
+    setOp($('agentResult'), agentOk || (afterSimple && reached('bothWin')) ? 1 : 0.55);
+    setStroke($('agentResult'), agentOk ? OK : (afterSimple && reached('bothWin') ? OK : LINE));
+    if (agentOk) {
+      $('agentResTitle').textContent = 'REFUND · DONE';
+      setFill($('agentResTitle'), OK);
+      $('agentResSub').textContent = 'damaged_item · 0.91';
+      setFill($('agentResSub'), MUTED);
+    } else if (afterSimple && reached('bothWin')) {
+      $('agentResTitle').textContent = 'SHIPPING · DONE';
+      setFill($('agentResTitle'), OK);
+      $('agentResSub').textContent = 'order 1042 tracked';
+      setFill($('agentResSub'), MUTED);
+    } else {
+      $('agentResTitle').textContent = 'REFUND BRANCH';
+      setFill($('agentResTitle'), DIM);
+      $('agentResSub').textContent = 'awaiting route';
+      setFill($('agentResSub'), DIM);
+    }
+
+    setOp($('botMetrics'), afterSimple && reached('bothWin') ? 1 : 0);
+    setOp($('agentShip'), afterSimple && reached('bothWin') ? 0 : 0); // metrics replace this
+
+    // Wires
+    setWire('wireTopIn', ph.wire === 'topIn' || ['rulesTry','rulesWin'].includes(ph.k), ph.k === 'rulesWin' ? OK : RES);
+    setWire('wireTopOut', ph.wire === 'topOut' || ph.k === 'rulesFail', ERR);
+    setWire('wireBotIn', ph.wire === 'botIn' || ['claudeJson','bothWin'].includes(ph.k), ph.k === 'bothWin' ? RES : REQ);
+    setWire('wireBotMid', ph.wire === 'botMid' || ph.k === 'toolCall', TOOL);
+    setWire('wireBotOut', ph.wire === 'botOut' || ph.k === 'agentOk', OK);
+
+    // Flying packet
+    if (ph.from){
+      const e = ease(local);
+      let x = lerp(ph.from[0], ph.to[0], e);
+      let y = lerp(ph.from[1], ph.to[1], e);
+      // slight arc
+      y -= Math.sin(e * Math.PI) * 18;
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(280, ph.label.length * 7.2 + 32);
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    // Toast on final phase
+    if (ph.k === 'lesson'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = 'Use agents where messy · rules where not';
+      toastText.textContent = label;
+      const w = label.length * 7.6 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('topFrame'), OK);
+      setStroke($('botFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  const jump = new URLSearchParams(location.search).get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

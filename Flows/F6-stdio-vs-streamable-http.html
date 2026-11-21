@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F6 — stdio vs Streamable HTTP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(92,200,255,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(177,140,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--req)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+.lede strong{color:var(--ink);font-weight:500}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+.caption code.e{color:var(--err)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+.notes code.t{color:var(--tool)}
+.notes code.o{color:var(--ok)}
+.notes code.r{color:var(--res)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>F6 — <em>stdio</em> vs Streamable HTTP</h1>
+    <span class="meta">two transports · same tools/call</span>
+  </header>
+  <p class="lede">Two ways a host talks to an MCP server. <strong>stdio</strong> = local child process, stdin/stdout pipes, dies with the host. <strong>Streamable HTTP</strong> = long-running <code>/mcp</code> endpoint, remote and shareable. Note: <strong>n8n MCP nodes do not support stdio</strong>.</p>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 620" role="img" aria-label="Comparison of MCP stdio pipes versus Streamable HTTP POST to a shared remote server">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+      <marker id="arrowTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b18cff"/>
+      </marker>
+      <marker id="arrowRes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ffb547"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="620" fill="url(#grid)"/>
+
+    <!-- ========== TOP: STDIO ========== -->
+    <g id="stdioBand">
+      <text x="36" y="28" fill="#5cc8ff" font-size="13" letter-spacing="2" font-weight="600">STDIO</text>
+      <text x="110" y="28" fill="#4d6276" font-size="11">same machine · no port · dies with host</text>
+
+      <!-- Claude Desktop host -->
+      <g id="stdioHost" transform="translate(0 0)">
+        <rect id="stdioHostFrame" x="36" y="44" width="280" height="200" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M36 60a16 16 0 0 1 16-16h248a16 16 0 0 1 16 16v20H36z" fill="#1d2a38"/>
+        <circle class="stdioLed" cx="58" cy="54" r="4" fill="#2a3a4b"/>
+        <circle class="stdioLed" cx="72" cy="54" r="4" fill="#2a3a4b"/>
+        <text x="92" y="58" fill="#8297ab" font-size="11">CLAUDE DESKTOP · host</text>
+
+        <rect id="stdioHostCard" x="52" y="96" width="248" height="72" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+        <text x="68" y="120" fill="#8297ab" font-size="10">LAUNCH</text>
+        <text id="stdioLaunchLine" x="68" y="142" fill="#4d6276" font-size="12">idle</text>
+        <text id="stdioLaunchSub" x="68" y="160" fill="#4d6276" font-size="10"></text>
+
+        <rect id="stdioCfg" x="52" y="180" width="248" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="68" y="200" fill="#8297ab" font-size="10">claude_desktop_config.json</text>
+        <text id="stdioCfgLine" x="68" y="216" fill="#4d6276" font-size="11">command: npx · args: …</text>
+      </g>
+
+      <!-- stdin / stdout tubes -->
+      <g id="stdioPipes">
+        <!-- stdin tube (host → child) -->
+        <rect id="stdinTube" x="330" y="100" width="200" height="22" rx="11" fill="#121c28" stroke="#2a3a4b" stroke-width="1.5"/>
+        <text id="stdinLbl" x="430" y="92" fill="#4d6276" font-size="10" text-anchor="middle">stdin · NDJSON-RPC →</text>
+        <!-- stdout tube (child → host) -->
+        <rect id="stdoutTube" x="330" y="168" width="200" height="22" rx="11" fill="#121c28" stroke="#2a3a4b" stroke-width="1.5"/>
+        <text id="stdoutLbl" x="430" y="210" fill="#4d6276" font-size="10" text-anchor="middle">← stdout · NDJSON-RPC</text>
+        <text id="pipeMeta" x="430" y="148" fill="#4d6276" font-size="10" text-anchor="middle">pipes · no TCP</text>
+      </g>
+
+      <!-- filesystem MCP child -->
+      <g id="stdioChild" transform="translate(0 0)">
+        <rect id="stdioChildFrame" x="550" y="44" width="494" height="200" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M550 60a16 16 0 0 1 16-16h462a16 16 0 0 1 16 16v20H550z" fill="#1d2a38"/>
+        <circle class="childLed" cx="572" cy="54" r="4" fill="#2a3a4b"/>
+        <circle class="childLed" cx="586" cy="54" r="4" fill="#2a3a4b"/>
+        <text x="606" y="58" fill="#8297ab" font-size="11">CHILD PROCESS · filesystem MCP</text>
+        <text id="childPid" x="1020" y="58" fill="#4d6276" font-size="10" text-anchor="end">not running</text>
+
+        <rect id="stdioCmd" x="568" y="92" width="458" height="56" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+        <text x="584" y="114" fill="#8297ab" font-size="10">npx @modelcontextprotocol/server-filesystem</text>
+        <text id="stdioCmdArgs" x="584" y="134" fill="#4d6276" font-size="12">./demo-data</text>
+
+        <rect id="stdioToolCard" x="568" y="162" width="220" height="60" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="584" y="184" fill="#8297ab" font-size="10">TOOL</text>
+        <text id="stdioToolLine" x="584" y="204" fill="#4d6276" font-size="13">read_file</text>
+
+        <rect id="stdioLife" x="804" y="162" width="222" height="60" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="820" y="184" fill="#8297ab" font-size="10">LIFECYCLE</text>
+        <text id="stdioLifeLine" x="820" y="204" fill="#4d6276" font-size="12">tied to host</text>
+      </g>
+    </g>
+
+    <!-- divider -->
+    <line x1="36" y1="268" x2="1044" y2="268" stroke="#2a3a4b" stroke-width="1" stroke-dasharray="4 6"/>
+    <text id="n8nNote" x="540" y="286" fill="#ffb547" font-size="11" text-anchor="middle" opacity=".85">n8n MCP nodes do not support stdio</text>
+
+    <!-- ========== BOTTOM: STREAMABLE HTTP ========== -->
+    <g id="httpBand">
+      <text x="36" y="318" fill="#ffb547" font-size="13" letter-spacing="2" font-weight="600">STREAMABLE HTTP</text>
+      <text x="220" y="318" fill="#4d6276" font-size="11">separate process · remote · shared</text>
+
+      <!-- hosts: n8n + Cursor -->
+      <g id="httpHosts" transform="translate(0 0)">
+        <rect id="n8nFrame" x="36" y="334" width="280" height="100" rx="14" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <text x="52" y="358" fill="#8297ab" font-size="10">N8N · MCP Client Tool</text>
+        <text id="n8nLine" x="52" y="382" fill="#4d6276" font-size="13">waiting…</text>
+        <text id="n8nSub" x="52" y="404" fill="#4d6276" font-size="11">requires HTTP transport</text>
+        <circle class="n8nLed" cx="292" cy="352" r="4" fill="#2a3a4b"/>
+
+        <rect id="cursorFrame" x="36" y="448" width="280" height="100" rx="14" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <text x="52" y="472" fill="#8297ab" font-size="10">CURSOR · MCP host</text>
+        <text id="cursorLine" x="52" y="496" fill="#4d6276" font-size="13">waiting…</text>
+        <text id="cursorSub" x="52" y="518" fill="#4d6276" font-size="11">mcp.json → url</text>
+        <circle class="cursorLed" cx="292" cy="466" r="4" fill="#2a3a4b"/>
+      </g>
+
+      <!-- HTTP wire + auth -->
+      <g id="httpWire">
+        <path id="wireN8n" d="M316 384 H520" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowRes)" opacity=".45"/>
+        <path id="wireCursor" d="M316 498 H520" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+        <path id="wireResHttp" d="M520 440 H316" fill="none" stroke="#2a3a4b" stroke-width="2" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".35"/>
+
+        <rect id="authBadge" x="340" y="418" width="160" height="28" rx="14" fill="#121c28" stroke="#2a3a4b"/>
+        <text id="authText" x="420" y="436" fill="#4d6276" font-size="10" text-anchor="middle">Authorization: Bearer</text>
+
+        <text id="wireN8nLbl" x="418" y="372" fill="#4d6276" font-size="10" text-anchor="middle">POST /mcp</text>
+        <text id="wireCursorLbl" x="418" y="530" fill="#4d6276" font-size="10" text-anchor="middle">POST /mcp</text>
+      </g>
+
+      <!-- ops-mcp server -->
+      <g id="httpServer" transform="translate(0 0)">
+        <rect id="httpServerFrame" x="540" y="334" width="504" height="214" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <path d="M540 350a16 16 0 0 1 16-16h472a16 16 0 0 1 16 16v20H540z" fill="#1d2a38"/>
+        <circle class="httpLed" cx="562" cy="344" r="4" fill="#2a3a4b"/>
+        <circle class="httpLed" cx="576" cy="344" r="4" fill="#2a3a4b"/>
+        <text x="596" y="348" fill="#8297ab" font-size="11">OPS-MCP · long-running process</text>
+        <text id="httpUrl" x="1020" y="348" fill="#4d6276" font-size="10" text-anchor="end">:3200/mcp</text>
+
+        <rect id="httpEndpoint" x="558" y="372" width="468" height="52" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+        <text x="574" y="394" fill="#8297ab" font-size="10">ENDPOINT</text>
+        <text id="httpEndpointLine" x="574" y="414" fill="#4d6276" font-size="13">https://ops-mcp:3200/mcp</text>
+
+        <rect id="httpToolCard" x="558" y="438" width="220" height="88" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="574" y="462" fill="#8297ab" font-size="10">SAME TOOL</text>
+        <text id="httpToolLine" x="574" y="486" fill="#4d6276" font-size="13">read_file / lookup…</text>
+        <text id="httpToolSub" x="574" y="508" fill="#4d6276" font-size="11">tools/call JSON-RPC</text>
+
+        <rect id="httpShare" x="794" y="438" width="232" height="88" rx="10" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="810" y="462" fill="#8297ab" font-size="10">SHARING</text>
+        <text id="httpShareLine" x="810" y="486" fill="#4d6276" font-size="12">1 server · N hosts</text>
+        <text id="httpShareSub" x="810" y="508" fill="#4d6276" font-size="11">can be remote</text>
+      </g>
+    </g>
+
+    <!-- Decision box (shown late) -->
+    <g id="decisionBox" opacity="0">
+      <rect x="200" y="250" width="680" height="72" rx="14" fill="#121c28" stroke="#3ddc97" stroke-width="2" filter="url(#glow)"/>
+      <text x="540" y="280" fill="#3ddc97" font-size="14" text-anchor="middle" font-weight="600">DECISION</text>
+      <text id="decisionText" x="540" y="304" fill="#e6edf3" font-size="13" text-anchor="middle">local dev tool → stdio  ·  shared, remote, n8n → Streamable HTTP</text>
+    </g>
+
+    <!-- Flying packet -->
+    <g id="packet" opacity="0" filter="url(#glow)">
+      <rect id="pill" x="-70" y="-16" width="140" height="32" rx="16" fill="#0f1720" stroke="#5cc8ff" stroke-width="1.5"/>
+      <text id="pillText" x="0" y="5" fill="#5cc8ff" font-size="12" text-anchor="middle">packet</text>
+      <circle id="dot" cx="0" cy="28" r="5" fill="#5cc8ff"/>
+    </g>
+
+    <!-- Success toast -->
+    <g id="toast" opacity="0" transform="translate(540 300)">
+      <g id="toastInner">
+        <rect id="toastBg" x="-160" y="-22" width="320" height="44" rx="22" fill="#0f1720" stroke="#3ddc97" stroke-width="1.5"/>
+        <circle cx="-134" cy="0" r="10" fill="none" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M-139 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="toastText" x="14" y="5" fill="#3ddc97" font-size="14" text-anchor="middle">stdio vs HTTP · pick by reach</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <div class="n" id="stepN">0</div>
+    <p id="stepText">Loading…</p>
+  </div>
+
+  <div class="rail" id="rail" aria-hidden="true">
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="primary" id="play">Pause</button>
+    <button type="button" id="replay">Replay</button>
+    <div class="sound">
+      <span>Sound</span>
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed">
+      <span>Speed</span>
+      <button type="button" data-s="0.5" aria-pressed="false">0.5x</button>
+      <button type="button" data-s="1" aria-pressed="true">1x</button>
+      <button type="button" data-s="1.5" aria-pressed="false">1.5x</button>
+    </div>
+  </div>
+
+  <section class="anatomy">
+    <h2>At a glance</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 220" role="img" aria-label="Comparison table of stdio versus Streamable HTTP for MCP">
+        <rect width="1080" height="220" fill="#16212d"/>
+        <!-- headers -->
+        <text x="80" y="28" fill="#8297ab" font-size="11" letter-spacing="1">DIMENSION</text>
+        <rect x="260" y="12" width="340" height="28" rx="8" fill="#0f1720" stroke="#5cc8ff"/>
+        <text x="430" y="31" fill="#5cc8ff" font-size="13" text-anchor="middle" font-weight="600">stdio</text>
+        <rect x="640" y="12" width="400" height="28" rx="8" fill="#0f1720" stroke="#ffb547"/>
+        <text x="840" y="31" fill="#ffb547" font-size="13" text-anchor="middle" font-weight="600">Streamable HTTP</text>
+
+        <!-- rows -->
+        <g font-size="12">
+          <text x="80" y="68" fill="#8297ab">Launch</text>
+          <text x="430" y="68" fill="#e6edf3" text-anchor="middle">host spawns child (npx…)</text>
+          <text x="840" y="68" fill="#e6edf3" text-anchor="middle">separate process / deploy</text>
+
+          <line x1="60" y1="82" x2="1020" y2="82" stroke="#2a3a4b" stroke-width="1"/>
+
+          <text x="80" y="106" fill="#8297ab">Network</text>
+          <text x="430" y="106" fill="#e6edf3" text-anchor="middle">stdin/stdout pipes · no port</text>
+          <text x="840" y="106" fill="#e6edf3" text-anchor="middle">POST https://…:3200/mcp</text>
+
+          <line x1="60" y1="120" x2="1020" y2="120" stroke="#2a3a4b" stroke-width="1"/>
+
+          <text x="80" y="144" fill="#8297ab">Auth</text>
+          <text x="430" y="144" fill="#e6edf3" text-anchor="middle">OS process boundary</text>
+          <text x="840" y="144" fill="#e6edf3" text-anchor="middle">Authorization: Bearer</text>
+
+          <line x1="60" y1="158" x2="1020" y2="158" stroke="#2a3a4b" stroke-width="1"/>
+
+          <text x="80" y="182" fill="#8297ab">Sharing</text>
+          <text x="430" y="182" fill="#e6edf3" text-anchor="middle">1 host · 1 child · local only</text>
+          <text x="840" y="182" fill="#e6edf3" text-anchor="middle">N hosts · remote OK</text>
+
+          <line x1="60" y1="196" x2="1020" y2="196" stroke="#2a3a4b" stroke-width="1"/>
+
+          <text x="80" y="214" fill="#8297ab">Typical hosts</text>
+          <text x="430" y="214" fill="#5cc8ff" text-anchor="middle">Claude Desktop · Cursor (local)</text>
+          <text x="840" y="214" fill="#ffb547" text-anchor="middle">n8n · Cursor · any HTTP client</text>
+        </g>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>Same JSON-RPC, different pipe</strong>Both transports carry <code class="t">tools/call</code> as newline-delimited or HTTP-bodied JSON-RPC. The tool contract does not change — only how bytes reach the server.</p>
+      <p><strong>stdio = local lifetime</strong>Claude Desktop runs <code>npx @modelcontextprotocol/server-filesystem ./demo-data</code> as a child. No port; when the host exits, the server dies.</p>
+      <p><strong>HTTP = shared reach</strong>ops-mcp listens on <code class="r">:3200/mcp</code> with a bearer token. n8n and Cursor can both POST. n8n cannot use stdio.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', LINE = '#2a3a4b', DIM = '#4d6276', MUTED = '#8297ab';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+  const stdioLeds = [...document.querySelectorAll('.stdioLed')];
+  const childLeds = [...document.querySelectorAll('.childLed')];
+  const httpLeds = [...document.querySelectorAll('.httpLed')];
+  const n8nLeds = [...document.querySelectorAll('.n8nLed')];
+  const cursorLeds = [...document.querySelectorAll('.cursorLed')];
+
+  const floaters = [
+    { id: 'stdioHost', amp: 2.2, speed: 0.2, phase: 0.2 },
+    { id: 'stdioChild', amp: 1.8, speed: 0.17, phase: 1.4 },
+    { id: 'httpHosts', amp: 2.0, speed: 0.18, phase: 0.8 },
+    { id: 'httpServer', amp: 1.6, speed: 0.15, phase: 2.1 },
+  ];
+
+  /*
+   * Phase array — edit `txt` captions freely.
+   * Alternates TOP (stdio) / BOTTOM (HTTP) with the same tools/call so the comparison is direct.
+   * Keys usable with ?at=<k> : intro, stdioSpawn, httpReady, stdioCall, httpN8nCall,
+   *   stdioResult, httpResult, httpCursor, decision, done
+   */
+  const P = [
+    // step 0 — frame both halves
+    { k:'intro', d:1.5, step:0,
+      txt:'Two transports, one contract: <code class="t">tools/call</code>. Top = <strong>stdio</strong> pipes. Bottom = <code class="r">Streamable HTTP</code>.',
+      tone:'rest' },
+
+    // step 1 — TOP: host launches child
+    { k:'stdioSpawn', d:2.2, step:1, from:[316,130], to:[550,130],
+      label:'spawn child', c:REQ, wire:'stdin',
+      txt:'<strong>stdio</strong>: Claude Desktop launches <code>npx @modelcontextprotocol/server-filesystem ./demo-data</code> as a child process.',
+      tone:'whoosh' },
+
+    // step 1b — BOTTOM: server already up (contrast)
+    { k:'httpReady', d:1.8, step:1,
+      txt:'<strong>HTTP</strong>: ops-mcp is already a long-running process at <code class="r">https://ops-mcp:3200/mcp</code> — not spawned by the host.',
+      tone:'soft' },
+
+    // step 2 — TOP: tools/call via stdin
+    { k:'stdioCall', d:2.2, step:2, from:[340,111], to:[520,111],
+      label:'tools/call read_file', c:TOOL, wire:'stdin',
+      txt:'stdio request: newline-delimited JSON-RPC on <code>stdin</code> — <code class="t">tools/call read_file</code>. Same machine, no port.',
+      tone:'whoosh' },
+
+    // step 3 — BOTTOM: same tools/call via POST from n8n
+    { k:'httpN8nCall', d:2.2, step:3, from:[316,384], to:[540,398],
+      label:'POST tools/call', c:RES, wire:'n8n',
+      txt:'HTTP request: n8n <code class="r">POST</code>s the <em>same</em> <code class="t">tools/call</code> to <code>/mcp</code> with <code>Authorization: Bearer</code>.',
+      tone:'whoosh' },
+
+    // step 4 — TOP: result on stdout
+    { k:'stdioResult', d:2.0, step:4, from:[520,179], to:[340,179],
+      label:'result JSON-RPC', c:OK, wire:'stdout',
+      txt:'stdio response: result JSON-RPC line on <code class="o">stdout</code>. Pipes only — nothing listens on a TCP port.',
+      tone:'whoosh' },
+
+    // step 5 — BOTTOM: HTTP result
+    { k:'httpResult', d:2.0, step:5, from:[540,440], to:[316,440],
+      label:'200 · tool result', c:OK, wire:'res',
+      txt:'HTTP response: structured tool result on the POST response (may stream). Server stays up for the next host.',
+      tone:'chime' },
+
+    // step 6 — BOTTOM: Cursor shares the same server
+    { k:'httpCursor', d:2.2, step:6, from:[316,498], to:[540,460],
+      label:'POST tools/call', c:REQ, wire:'cursor',
+      txt:'Cursor also <code>POST</code>s to the <em>same</em> ops-mcp. One shared remote server — impossible with stdio’s 1:1 child.',
+      tone:'whoosh' },
+
+    // step 7 — decision
+    { k:'decision', d:2.6, step:7,
+      txt:'Rule of thumb: <code>local dev tool → stdio</code> · <code class="r">shared, remote, n8n → Streamable HTTP</code>. n8n cannot speak stdio.',
+      tone:'blip' },
+
+    // step 8 — done
+    { k:'done', d:2.8, step:8,
+      txt:'Pick the transport by <strong>reach</strong>, not by tool shape. The JSON-RPC method stays <code class="t">tools/call</code> either way.',
+      tone:'resolve' },
+  ];
+
+  const at = k => P.findIndex(p => p.k === k);
+  const total = P.reduce((a, p) => a + p.d, 0);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+  function setFill(el, color){ if (el) el.setAttribute('fill', color); }
+  function setOp(el, o){ if (el) el.setAttribute('opacity', o); }
+
+  function pulseLeds(leds, on, color){
+    leds.forEach((l, i) => setFill(l, on && Math.floor(t * 8 + i) % 3 === 0 ? color : LINE));
+  }
+
+  function setTube(id, lblId, on, color){
+    setStroke($(id), on ? color : LINE);
+    setOp($(id), on ? 1 : 0.7);
+    if (lblId) setFill($(lblId), on ? color : DIM);
+  }
+
+  function setWire(id, lblId, on, color){
+    const path = $(id);
+    if (path){
+      path.setAttribute('stroke', on ? color : LINE);
+      path.setAttribute('opacity', on ? 1 : 0.45);
+    }
+    if (lblId) setFill($(lblId), on ? color : DIM);
+  }
+
+  function render(){
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+    rail.forEach((r, i) => {
+      const stepIdx = i + 1;
+      r.className = stepIdx <= ph.step ? 'on' + (ph.k === 'done' ? ' done' : '') : '';
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      $(f.id).setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // --- STDIO band ---
+    const stdioHot = reached('stdioSpawn');
+    const childLive = reached('stdioSpawn');
+    setStroke($('stdioHostFrame'), ph.k === 'done' || ph.k === 'decision' ? OK : (stdioHot ? REQ : LINE));
+    setStroke($('stdioChildFrame'), ph.k === 'done' || ph.k === 'decision' ? OK : (childLive ? TOOL : LINE));
+    pulseLeds(stdioLeds, stdioHot, REQ);
+    pulseLeds(childLeds, childLive, TOOL);
+
+    setOp($('stdioHostCard'), stdioHot ? 1 : 0.7);
+    setStroke($('stdioHostCard'), stdioHot ? REQ : LINE);
+    if (ph.k === 'stdioSpawn'){
+      $('stdioLaunchLine').textContent = 'spawning npx…';
+      $('stdioLaunchSub').textContent = 'child process';
+    } else if (reached('stdioSpawn')){
+      $('stdioLaunchLine').textContent = 'child attached';
+      $('stdioLaunchSub').textContent = 'stdin ↔ stdout';
+    } else {
+      $('stdioLaunchLine').textContent = 'idle';
+      $('stdioLaunchSub').textContent = '';
+    }
+    setFill($('stdioLaunchLine'), stdioHot ? '#e6edf3' : DIM);
+    setFill($('stdioLaunchSub'), stdioHot ? REQ : DIM);
+    $('stdioCfgLine').textContent = stdioHot
+      ? 'npx …/server-filesystem ./demo-data'
+      : 'command: npx · args: …';
+    setFill($('stdioCfgLine'), stdioHot ? '#e6edf3' : DIM);
+    setStroke($('stdioCfg'), stdioHot ? REQ : LINE);
+
+    setOp($('stdioCmd'), childLive ? 1 : 0.7);
+    setStroke($('stdioCmd'), childLive ? TOOL : LINE);
+    $('stdioCmdArgs').textContent = childLive ? './demo-data · scoped folder' : './demo-data';
+    setFill($('stdioCmdArgs'), childLive ? '#e6edf3' : DIM);
+    $('childPid').textContent = childLive ? 'pid live · no :port' : 'not running';
+    setFill($('childPid'), childLive ? TOOL : DIM);
+
+    const toolStdio = ['stdioCall','stdioResult'].includes(ph.k) || (reached('stdioCall') && !reached('decision'));
+    setOp($('stdioToolCard'), toolStdio || reached('stdioCall') ? 1 : 0.55);
+    setStroke($('stdioToolCard'), toolStdio ? TOOL : LINE);
+    $('stdioToolLine').textContent = ph.k === 'stdioCall' ? 'read_file · running' : (reached('stdioResult') ? 'read_file · ok' : 'read_file');
+    setFill($('stdioToolLine'), toolStdio || reached('stdioCall') ? (reached('stdioResult') ? OK : TOOL) : DIM);
+
+    setOp($('stdioLife'), childLive ? 1 : 0.55);
+    setStroke($('stdioLife'), childLive ? RES : LINE);
+    $('stdioLifeLine').textContent = childLive ? 'dies with host' : 'tied to host';
+    setFill($('stdioLifeLine'), childLive ? RES : DIM);
+
+    setTube('stdinTube', 'stdinLbl', ph.wire === 'stdin' || ['stdioSpawn','stdioCall'].includes(ph.k), ph.k === 'stdioSpawn' ? REQ : TOOL);
+    setTube('stdoutTube', 'stdoutLbl', ph.wire === 'stdout' || ph.k === 'stdioResult', OK);
+    setFill($('pipeMeta'), reached('stdioCall') ? MUTED : DIM);
+    $('pipeMeta').textContent = reached('stdioCall') ? 'NDJSON-RPC · no TCP' : 'pipes · no TCP';
+
+    // --- HTTP band ---
+    const httpUp = reached('httpReady');
+    setStroke($('httpServerFrame'), ph.k === 'done' || ph.k === 'decision' ? OK : (httpUp ? RES : LINE));
+    pulseLeds(httpLeds, httpUp, RES);
+    setOp($('httpEndpoint'), httpUp ? 1 : 0.7);
+    setStroke($('httpEndpoint'), httpUp ? RES : LINE);
+    $('httpEndpointLine').textContent = httpUp ? 'https://ops-mcp:3200/mcp · listening' : 'https://ops-mcp:3200/mcp';
+    setFill($('httpEndpointLine'), httpUp ? '#e6edf3' : DIM);
+    $('httpUrl').textContent = httpUp ? 'sessionless · up' : ':3200/mcp';
+    setFill($('httpUrl'), httpUp ? RES : DIM);
+
+    const n8nHot = reached('httpN8nCall');
+    setStroke($('n8nFrame'), ph.k === 'done' || ph.k === 'decision' ? OK : (n8nHot ? RES : LINE));
+    pulseLeds(n8nLeds, n8nHot, RES);
+    if (ph.k === 'httpN8nCall'){
+      $('n8nLine').textContent = 'POST tools/call…';
+      $('n8nSub').textContent = 'Bearer token set';
+    } else if (reached('httpN8nCall')){
+      $('n8nLine').textContent = 'tool result received';
+      $('n8nSub').textContent = 'HTTP only · no stdio';
+    } else {
+      $('n8nLine').textContent = 'waiting…';
+      $('n8nSub').textContent = 'requires HTTP transport';
+    }
+    setFill($('n8nLine'), n8nHot ? '#e6edf3' : DIM);
+    setFill($('n8nSub'), n8nHot ? RES : DIM);
+
+    const cursorHot = reached('httpCursor');
+    setStroke($('cursorFrame'), ph.k === 'done' || ph.k === 'decision' ? OK : (cursorHot ? REQ : LINE));
+    pulseLeds(cursorLeds, cursorHot, REQ);
+    if (ph.k === 'httpCursor'){
+      $('cursorLine').textContent = 'POST tools/call…';
+      $('cursorSub').textContent = 'same /mcp URL';
+    } else if (reached('httpCursor')){
+      $('cursorLine').textContent = 'shared server OK';
+      $('cursorSub').textContent = 'N hosts · 1 process';
+    } else {
+      $('cursorLine').textContent = 'waiting…';
+      $('cursorSub').textContent = 'mcp.json → url';
+    }
+    setFill($('cursorLine'), cursorHot ? '#e6edf3' : DIM);
+    setFill($('cursorSub'), cursorHot ? REQ : DIM);
+
+    const httpToolOn = ['httpN8nCall','httpResult','httpCursor'].includes(ph.k) || reached('httpN8nCall');
+    setOp($('httpToolCard'), httpToolOn ? 1 : 0.55);
+    setStroke($('httpToolCard'), httpToolOn ? TOOL : LINE);
+    $('httpToolLine').textContent = ph.k === 'httpN8nCall' || ph.k === 'httpCursor'
+      ? 'tools/call · handling'
+      : (reached('httpResult') ? 'tools/call · ok' : 'read_file / lookup…');
+    setFill($('httpToolLine'), httpToolOn ? (reached('httpResult') ? OK : TOOL) : DIM);
+    setFill($('httpToolSub'), httpToolOn ? MUTED : DIM);
+
+    setOp($('httpShare'), reached('httpCursor') ? 1 : (httpUp ? 0.75 : 0.55));
+    setStroke($('httpShare'), reached('httpCursor') ? SSE : LINE);
+    $('httpShareLine').textContent = reached('httpCursor') ? 'n8n + Cursor live' : '1 server · N hosts';
+    setFill($('httpShareLine'), reached('httpCursor') ? SSE : DIM);
+    $('httpShareSub').textContent = reached('httpCursor') ? 'remote · shared' : 'can be remote';
+    setFill($('httpShareSub'), reached('httpCursor') ? MUTED : DIM);
+
+    setWire('wireN8n', 'wireN8nLbl', ph.wire === 'n8n' || ph.k === 'httpN8nCall', RES);
+    setWire('wireCursor', 'wireCursorLbl', ph.wire === 'cursor' || ph.k === 'httpCursor', REQ);
+    setWire('wireResHttp', null, ph.wire === 'res' || ph.k === 'httpResult', OK);
+
+    const authOn = reached('httpN8nCall');
+    setStroke($('authBadge'), authOn ? RES : LINE);
+    $('authText').textContent = authOn ? 'Bearer · ok' : 'Authorization: Bearer';
+    setFill($('authText'), authOn ? RES : DIM);
+
+    // n8n note pulse on HTTP phases
+    setOp($('n8nNote'), ['httpReady','httpN8nCall','httpResult','httpCursor','decision','done'].includes(ph.k) ? 1 : 0.55);
+
+    // --- Decision overlay ---
+    if (ph.k === 'decision' || ph.k === 'done'){
+      const s = ph.k === 'decision' ? clamp(lt / 0.4) : 1;
+      setOp($('decisionBox'), s * (ph.k === 'done' ? 0.35 : 1));
+    } else {
+      setOp($('decisionBox'), 0);
+    }
+
+    // Dim inactive band slightly during the other half's action
+    const topFocus = ['stdioSpawn','stdioCall','stdioResult'].includes(ph.k);
+    const botFocus = ['httpReady','httpN8nCall','httpResult','httpCursor'].includes(ph.k);
+    setOp($('stdioBand'), botFocus && !topFocus ? 0.55 : 1);
+    setOp($('httpBand'), topFocus && !botFocus ? 0.55 : 1);
+
+    // --- Flying packet ---
+    if (ph.from){
+      const e = ease(local);
+      const x = lerp(ph.from[0], ph.to[0], e);
+      const y = lerp(ph.from[1], ph.to[1], e);
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(300, Math.max(120, ph.label.length * 7.2 + 32));
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    // --- Success toast ---
+    if (ph.k === 'done'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = 'stdio vs HTTP · pick by reach';
+      toastText.textContent = label;
+      const w = label.length * 8.2 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('stdioHostFrame'), OK);
+      setStroke($('stdioChildFrame'), OK);
+      setStroke($('n8nFrame'), OK);
+      setStroke($('cursorFrame'), OK);
+      setStroke($('httpServerFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  const jump = new URLSearchParams(location.search).get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

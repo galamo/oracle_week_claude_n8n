@@ -1,0 +1,95 @@
+{
+  "name": "Ex 10 — Agent with MCP tools (start)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dfe7c90c-a278-4627-a874-2d6f9975ccae",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "3f4014eb-8f8b-463c-b421-a2f2ad93e50f"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.text }}",
+        "options": {}
+      },
+      "id": "8e240e99-c2e3-42ec-bef0-69d6ca41002a",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer: $json.output }) }}",
+        "options": {}
+      },
+      "id": "b079bf26-3ae9-4283-af22-d77dd8e8437c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Ex 10 — your task\n1. Attach an **OpenRouter Chat Model** to the agent (model: anthropic/claude-sonnet-5.5)\n2. Attach an **MCP Client Tool**: endpoint http://host.docker.internal:3200/mcp, transport HTTP Streamable, auth Bearer (ops-mcp token)\n3. Tools to include: **selected** → lookup_customer, get_order, search_kb only\n4. Write the agent system message (Options → System Message)",
+        "height": 230,
+        "width": 560
+      },
+      "id": "9c6feddd-7ab1-4002-a6de-61d821ec1d6a",
+      "name": "Note b13e",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        20
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

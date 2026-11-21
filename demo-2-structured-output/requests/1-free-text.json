@@ -1,0 +1,14 @@
+{
+  "model": "__MODEL__",
+  "max_tokens": 300,
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful customer-support assistant."
+    },
+    {
+      "role": "user",
+      "content": "Classify this customer request:\n\nMy package came broken, I want my money back but can I keep the box? Order 1042."
+    }
+  ]
+}

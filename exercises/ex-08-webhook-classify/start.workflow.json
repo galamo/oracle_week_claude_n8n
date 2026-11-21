@@ -1,0 +1,69 @@
+{
+  "name": "Ex 8 — Webhook triage (start)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "081d7c2c-ace9-428d-823c-76beb5114696",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "b31cb95e-e8f7-497b-bf37-e76e5e3eeec4"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "f274fdc5-b134-4eeb-ae81-e15c5e6d601e",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Ex 8 — your task\nRight now this workflow just echoes the request body.\n\nAdd 3 nodes between Webhook and Respond:\n1. **Edit Fields** \"Config\": model, system_prompt, schema_json, text = {{ $json.body.text }}\n2. **HTTP Request** \"Classify with Claude\": POST to OpenRouter /chat/completions, credential = OpenRouter, JSON body with response_format\n3. **Edit Fields** \"Parse JSON\": triage = {{ JSON.parse($json.choices[0].message.content) }}\n\nThen respond with the triage object.\nPrompt + schema: ../ex-02-classifier-schema (your Lab A files)",
+        "height": 280,
+        "width": 600
+      },
+      "id": "31591ae8-43dc-4e11-a71c-3d2e35d0341b",
+      "name": "Note d5c5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        180,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

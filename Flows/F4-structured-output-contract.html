@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F4 — Structured output contract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(92,200,255,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(177,140,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--req)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+.caption code.e{color:var(--err)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+.rail div.on.fail{background:var(--err)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+.notes code.o{color:var(--ok)}
+.notes code.t{color:var(--tool)}
+.notes code.e{color:var(--err)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>F4 — <em>Structured</em> output contract</h1>
+    <span class="meta">Claude · JSON Schema · n8n Switch</span>
+  </header>
+  <p class="lede">Structured output is the contract between <strong style="color:var(--ink);font-weight:500">Claude</strong> and <strong style="color:var(--ink);font-weight:500">n8n</strong>. Without a schema, prose breaks the Switch. With <code>output_config.format</code>, fields are guaranteed — and <code>strict: true</code> validates tool inputs the same way.</p>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 520" role="img" aria-label="Ticket text to Claude with JSON Schema then to an n8n Switch with four outputs">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+      <marker id="arrowErr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/>
+      </marker>
+      <marker id="arrowTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b18cff"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="520" fill="url(#grid)"/>
+
+    <!-- WIRES -->
+    <g id="wires">
+      <path id="wireTicket" d="M250 180 H300" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireOut" d="M620 200 H690" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+      <text id="wireTicketLbl" x="275" y="168" fill="#4d6276" font-size="11" text-anchor="middle">ticket</text>
+      <text id="wireOutLbl" x="655" y="188" fill="#4d6276" font-size="11" text-anchor="middle">JSON</text>
+    </g>
+
+    <!-- LEFT: TICKET -->
+    <g id="ticketBox" transform="translate(0 0)">
+      <rect id="ticketFrame" x="28" y="48" width="222" height="320" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M28 64a18 18 0 0 1 18-16h186a18 18 0 0 1 18 16v22H28z" fill="#1d2a38"/>
+      <circle cx="50" cy="60" r="4" fill="#ff6b6b"/><circle cx="64" cy="60" r="4" fill="#ffb547"/><circle cx="78" cy="60" r="4" fill="#3ddc97"/>
+      <text x="96" y="64" fill="#8297ab" font-size="12">INCOMING TICKET</text>
+
+      <rect id="ticketCard" x="48" y="110" width="182" height="200" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="64" y="134" fill="#8297ab" font-size="10">SUPPORT · #4812</text>
+      <text id="ticketL1" x="64" y="164" fill="#e6edf3" font-size="13">I never got my</text>
+      <text id="ticketL2" x="64" y="186" fill="#e6edf3" font-size="13">refund for order</text>
+      <text id="ticketL3" x="64" y="208" fill="#e6edf3" font-size="13">#A-9021. Please</text>
+      <text id="ticketL4" x="64" y="230" fill="#e6edf3" font-size="13">fix this ASAP.</text>
+      <text x="64" y="268" fill="#4d6276" font-size="11">from: amy@…</text>
+      <text x="64" y="288" fill="#4d6276" font-size="11">channel: email</text>
+
+      <text x="139" y="348" fill="#8297ab" font-size="12" text-anchor="middle" letter-spacing="1.5">TEXT IN</text>
+    </g>
+
+    <!-- MIDDLE: CLAUDE + SCHEMA -->
+    <g id="claudeBox" transform="translate(0 0)">
+      <rect id="claudeFrame" x="300" y="48" width="320" height="400" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M300 64a18 18 0 0 1 18-16h284a18 18 0 0 1 18 16v22H300z" fill="#1d2a38"/>
+      <circle class="claudeLed" cx="322" cy="60" r="4" fill="#2a3a4b"/><circle class="claudeLed" cx="336" cy="60" r="4" fill="#2a3a4b"/>
+      <text x="356" y="64" fill="#8297ab" font-size="12">CLAUDE · Messages API</text>
+
+      <!-- Generation panel -->
+      <rect id="genPanel" x="320" y="100" width="280" height="100" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="336" y="122" fill="#8297ab" font-size="10">GENERATION</text>
+      <text id="genLine1" x="336" y="148" fill="#4d6276" font-size="12">awaiting prompt…</text>
+      <text id="genLine2" x="336" y="168" fill="#4d6276" font-size="12"></text>
+      <text id="genLine3" x="336" y="188" fill="#4d6276" font-size="11"></text>
+
+      <!-- Schema card -->
+      <rect id="schemaCard" x="320" y="218" width="280" height="200" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".5"/>
+      <text id="schemaTitle" x="336" y="240" fill="#4d6276" font-size="10">JSON SCHEMA · output_config.format</text>
+
+      <g id="fieldCat" opacity=".45">
+        <rect class="fBox" x="336" y="254" width="248" height="26" rx="6" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="348" y="271" fill="#8297ab" font-size="11">category</text>
+        <text id="valCat" x="568" y="271" fill="#4d6276" font-size="11" text-anchor="end">enum</text>
+      </g>
+      <g id="fieldPri" opacity=".45">
+        <rect class="fBox" x="336" y="286" width="248" height="26" rx="6" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="348" y="303" fill="#8297ab" font-size="11">priority</text>
+        <text id="valPri" x="568" y="303" fill="#4d6276" font-size="11" text-anchor="end">enum</text>
+      </g>
+      <g id="fieldConf" opacity=".45">
+        <rect class="fBox" x="336" y="318" width="248" height="26" rx="6" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="348" y="335" fill="#8297ab" font-size="11">confidence</text>
+        <text id="valConf" x="568" y="335" fill="#4d6276" font-size="11" text-anchor="end">0–1</text>
+      </g>
+      <g id="fieldHum" opacity=".45">
+        <rect class="fBox" x="336" y="350" width="248" height="26" rx="6" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="348" y="367" fill="#8297ab" font-size="11">needs_human</text>
+        <text id="valHum" x="568" y="367" fill="#4d6276" font-size="11" text-anchor="end">boolean</text>
+      </g>
+      <g id="fieldSum" opacity=".45">
+        <rect class="fBox" x="336" y="382" width="248" height="26" rx="6" fill="#16212d" stroke="#2a3a4b"/>
+        <text x="348" y="399" fill="#8297ab" font-size="11">summary</text>
+        <text id="valSum" x="568" y="399" fill="#4d6276" font-size="11" text-anchor="end">string</text>
+      </g>
+
+      <!-- Strict tool badge -->
+      <g id="strictBadge" opacity="0">
+        <rect x="320" y="430" width="280" height="28" rx="8" fill="#121c28" stroke="#3ddc97"/>
+        <circle cx="340" cy="444" r="7" fill="#0f1720" stroke="#3ddc97" stroke-width="1.5"/>
+        <path d="M336 444l3 3 6-7" fill="none" stroke="#3ddc97" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="358" y="448" fill="#3ddc97" font-size="12">strict: true · tool input valid</text>
+      </g>
+    </g>
+
+    <!-- Parser badge between Claude and Switch -->
+    <g id="parser" opacity="0">
+      <rect id="parserBg" x="628" y="248" width="72" height="36" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="parserText" x="664" y="270" fill="#4d6276" font-size="11" text-anchor="middle">parser</text>
+    </g>
+
+    <!-- RIGHT: n8n SWITCH -->
+    <g id="switchBox" transform="translate(0 0)">
+      <rect id="switchFrame" x="710" y="48" width="342" height="400" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M710 64a18 18 0 0 1 18-16h306a18 18 0 0 1 18 16v22H710z" fill="#1d2a38"/>
+      <text x="736" y="64" fill="#8297ab" font-size="12">n8n · SWITCH</text>
+      <text x="1028" y="64" fill="#4d6276" font-size="10" text-anchor="end">4 outputs</text>
+
+      <rect id="switchIn" x="730" y="100" width="302" height="44" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="746" y="118" fill="#8297ab" font-size="10">INPUT</text>
+      <text id="switchInVal" x="746" y="136" fill="#4d6276" font-size="12">waiting…</text>
+
+      <!-- Four outputs -->
+      <g id="outCat">
+        <rect class="oBox" x="730" y="164" width="302" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="oDot" cx="752" cy="188" r="6" fill="#2a3a4b"/>
+        <text x="770" y="184" fill="#e6edf3" font-size="13" font-weight="600">category → route</text>
+        <text id="outCatSub" x="770" y="202" fill="#4d6276" font-size="11">refund | shipping | billing…</text>
+      </g>
+      <g id="outPri">
+        <rect class="oBox" x="730" y="224" width="302" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="oDot" cx="752" cy="248" r="6" fill="#2a3a4b"/>
+        <text x="770" y="244" fill="#e6edf3" font-size="13" font-weight="600">priority → SLA</text>
+        <text id="outPriSub" x="770" y="262" fill="#4d6276" font-size="11">high | medium | low</text>
+      </g>
+      <g id="outHum">
+        <rect class="oBox" x="730" y="284" width="302" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="oDot" cx="752" cy="308" r="6" fill="#2a3a4b"/>
+        <text x="770" y="304" fill="#e6edf3" font-size="13" font-weight="600">human review</text>
+        <text id="outHumSub" x="770" y="322" fill="#4d6276" font-size="11">needs_human || conf &lt; 0.7</text>
+      </g>
+      <g id="outSum">
+        <rect class="oBox" x="730" y="344" width="302" height="48" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="oDot" cx="752" cy="368" r="6" fill="#2a3a4b"/>
+        <text x="770" y="364" fill="#e6edf3" font-size="13" font-weight="600">summary → CRM note</text>
+        <text id="outSumSub" x="770" y="382" fill="#4d6276" font-size="11">one-line string</text>
+      </g>
+
+      <text id="failBanner" x="881" y="430" fill="#ff6b6b" font-size="13" text-anchor="middle" opacity="0" font-weight="600">execution failed · undefined</text>
+    </g>
+
+    <!-- Schema overlay grid (Phase B flash) -->
+    <g id="schemaOverlay" opacity="0">
+      <rect x="310" y="210" width="300" height="216" rx="14" fill="none" stroke="#b18cff" stroke-width="2" stroke-dasharray="4 4"/>
+      <text x="460" y="204" fill="#b18cff" font-size="11" text-anchor="middle">schema constrains tokens</text>
+    </g>
+
+    <g id="packet" opacity="0">
+      <rect id="pill" x="-90" y="-42" width="180" height="26" rx="13" fill="#16212d" stroke="#5cc8ff" stroke-width="1.6"/>
+      <text id="pillText" x="0" y="-24" fill="#5cc8ff" font-size="11" font-weight="500" text-anchor="middle"></text>
+      <circle id="dot" r="8" fill="#5cc8ff" filter="url(#glow)"/>
+    </g>
+
+    <g id="toast" opacity="0" transform="translate(540 52)">
+      <g id="toastInner">
+        <rect id="toastBg" x="-150" y="-22" width="300" height="44" rx="22" fill="#3ddc97" filter="url(#glow)"/>
+        <circle cx="-124" cy="0" r="12" fill="#0f1720"/>
+        <path d="M-129 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="toastText" x="10" y="5" fill="#0f1720" font-size="14" font-weight="600" text-anchor="middle">Contract holds</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <span class="n" id="stepN">0</span>
+    <p id="stepText">Three boxes: ticket text → Claude → n8n Switch. The schema is the contract.</p>
+  </div>
+  <div class="rail" id="rail"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+
+  <div class="controls">
+    <button class="primary" id="play" type="button">Pause</button>
+    <button id="replay" type="button">Replay</button>
+    <div class="sound" role="group" aria-label="Sound">
+      Sound
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed" role="group" aria-label="Speed">Speed
+      <button type="button" data-s="0.5" aria-pressed="false">0.5×</button>
+      <button type="button" data-s="1" aria-pressed="true">1×</button>
+      <button type="button" data-s="1.5" aria-pressed="false">1.5×</button>
+    </div>
+  </div>
+
+  <section class="anatomy" aria-label="Schema to Switch at a glance">
+    <h2>At a glance — schema → JSON → Switch</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 150" role="img" aria-label="JSON Schema produces valid JSON that drives an n8n Switch">
+        <rect width="1080" height="150" fill="#16212d"/>
+        <g>
+          <rect x="40" y="36" width="240" height="78" rx="14" fill="#0f1720" stroke="#b18cff" stroke-width="1.5"/>
+          <text x="160" y="68" fill="#b18cff" font-size="15" text-anchor="middle" font-weight="600">JSON Schema</text>
+          <text x="160" y="92" fill="#8297ab" font-size="11" text-anchor="middle">output_config.format</text>
+        </g>
+        <path class="pipe-flow" d="M280 75 H360" fill="none" stroke="#5cc8ff" stroke-width="1.8"/>
+        <path d="M352 69 l8 6 l-8 6" fill="none" stroke="#5cc8ff" stroke-width="1.6"/>
+        <g>
+          <rect x="360" y="36" width="280" height="78" rx="14" fill="#0f1720" stroke="#3ddc97" stroke-width="1.5"/>
+          <text x="500" y="68" fill="#3ddc97" font-size="15" text-anchor="middle" font-weight="600">Valid JSON</text>
+          <text x="500" y="92" fill="#8297ab" font-size="11" text-anchor="middle">{ category, priority, confidence… }</text>
+        </g>
+        <path class="pipe-flow" d="M640 75 H720" fill="none" stroke="#3ddc97" stroke-width="1.8"/>
+        <path d="M712 69 l8 6 l-8 6" fill="none" stroke="#3ddc97" stroke-width="1.6"/>
+        <g>
+          <rect x="720" y="36" width="320" height="78" rx="14" fill="#0f1720" stroke="#5eead4" stroke-width="1.5"/>
+          <text x="880" y="68" fill="#5eead4" font-size="15" text-anchor="middle" font-weight="600">n8n Switch</text>
+          <text x="880" y="92" fill="#8297ab" font-size="11" text-anchor="middle">4 outputs · fields never undefined</text>
+        </g>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>Phase A — no schema</strong>Friendly prose looks helpful, but the parser gets text, not fields. Switch sees <code class="e">undefined</code> and the run fails.</p>
+      <p><strong>Phase B — JSON outputs</strong><code>output_config.format</code> + JSON Schema: every token must fit a field. Switch routes on real values; <code>confidence 0.62</code> trips human review.</p>
+      <p><strong>Phase C — strict tools</strong><code class="o">strict: true</code> on a tool schema validates <em>tool inputs</em> the same way. JSON outputs shape the reply; strict shapes what Claude may call.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', ERR = '#ff6b6b', LINE = '#2a3a4b', DIM = '#4d6276', MUTED = '#8297ab', INK = '#e6edf3';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+  const claudeLeds = [...document.querySelectorAll('.claudeLed')];
+
+  const floaters = [
+    { id: 'ticketBox', amp: 2.2, speed: 0.19, phase: 0.3 },
+    { id: 'claudeBox', amp: 1.8, speed: 0.15, phase: 1.4 },
+    { id: 'switchBox', amp: 2.0, speed: 0.17, phase: 2.1 },
+  ];
+
+  /*
+   * PHASE ARRAY — edit txt captions freely.
+   * k = key (?at=<k>), d = duration seconds, step = progress rail index,
+   * from/to = packet flight, label/c/wire = packet visuals, tone = WebAudio cue.
+   *
+   * Narrative:
+   *   A — no schema → prose → parser red → Switch undefined → fail
+   *   B — output_config.format → schema overlay → tokens snap → JSON → Switch routes
+   *       → confidence 0.62 < 0.7 lights human review
+   *   C — strict: true → tool input validated (green check)
+   */
+  const P = [
+    // Intro
+    { k:'idle', d:1.4, step:0,
+      txt:'Three boxes: <strong>ticket text</strong> → <strong>Claude</strong> → <strong>n8n Switch</strong>. The schema is the contract between them.',
+      tone:'rest' },
+
+    // Ticket arrives
+    { k:'ticket', d:1.6, step:1,
+      txt:'A support ticket lands: refund for order <code>#A-9021</code>. Plain English — Claude must turn it into fields the Switch can branch on.',
+      tone:'soft' },
+
+    // Ticket → Claude
+    { k:'toClaude', d:1.8, step:1, from:[250,180], to:[340,150], label:'ticket text', c:REQ, wire:'ticket',
+      txt:'Ticket → Claude. <strong>Phase A:</strong> no schema yet — just a free-form Messages API call.',
+      tone:'whoosh' },
+
+    // Prose out (failure path)
+    { k:'prose', d:2.2, step:2,
+      txt:'Claude answers helpfully: <code class="r">“Sure! This looks like a refund…”</code> — friendly prose, not structured fields.',
+      tone:'blip' },
+
+    // Prose flies toward Switch
+    { k:'proseFly', d:1.8, step:2, from:[600,150], to:[700,220], label:'prose blob', c:RES, wire:'out',
+      txt:'That prose hits the parser. n8n expected <code>{ category, priority… }</code> — it gets a sentence instead.',
+      tone:'whoosh' },
+
+    // Parser fails
+    { k:'parseFail', d:2.0, step:2,
+      txt:'Parser turns <code class="e">red</code>. Switch input = <code class="e">undefined</code>. Execution fails — no branch can fire.',
+      tone:'blip' },
+
+    // Reset / introduce schema
+    { k:'schemaOn', d:2.0, step:3,
+      txt:'<strong>Phase B:</strong> same call with <code class="t">output_config.format</code> = JSON Schema. Generation is now constrained to the fields.',
+      tone:'chime' },
+
+    // Schema overlay
+    { k:'overlay', d:1.8, step:3,
+      txt:'Schema grid overlays generation: <code>category</code> enum, <code>priority</code> enum, <code>confidence</code> 0–1, <code>needs_human</code> bool, <code>summary</code> string.',
+      tone:'soft' },
+
+    // Tokens snap into fields
+    { k:'snap', d:2.4, step:4,
+      txt:'Tokens snap into schema slots — not free text. Each field fills with a typed value that will parse every time.',
+      tone:'blip' },
+
+    // Valid JSON out
+    { k:'jsonOut', d:2.0, step:5, from:[600,200], to:[740,122], label:'valid JSON', c:OK, wire:'out',
+      txt:'Valid JSON slides out: <code class="o">{ "category":"refund", "priority":"high", "confidence":0.62, … }</code>',
+      tone:'whoosh' },
+
+    // Switch lights category / priority / summary
+    { k:'switchHit', d:2.2, step:5,
+      txt:'Each field lights a Switch output: <code class="o">category→route</code>, <code>priority→SLA</code>, <code>summary→CRM</code>. Branches are real values, not guesswork.',
+      tone:'chime' },
+
+    // Human review branch
+    { k:'human', d:2.2, step:6,
+      txt:'<code class="r">confidence 0.62 &lt; 0.7</code> → <code class="s">needs_human: true</code>. The <strong>human review</strong> output lights — threshold logic on guaranteed numbers.',
+      tone:'blip' },
+
+    // Strict tool use
+    { k:'strict', d:2.2, step:7,
+      txt:'<strong>Phase C:</strong> <code class="o">strict: true</code> on a tool schema. Same idea, different surface: tool <em>inputs</em> are validated before the call runs.',
+      tone:'whoosh' },
+
+    // Green check
+    { k:'validated', d:2.0, step:7,
+      txt:'Tool input passes schema → green check. <code>output_config.format</code> shapes the <em>reply</em>; <code class="o">strict: true</code> shapes what Claude may <em>call</em>.',
+      tone:'chime' },
+
+    // Done
+    { k:'done', d:3.0, step:7,
+      txt:'Contract: schema → JSON → Switch. Drop the “retry until JSON parses” hacks — the API enforces the shape.',
+      tone:'resolve' },
+  ];
+
+  const at = k => P.findIndex(p => p.k === k);
+  const total = P.reduce((a, p) => a + p.d, 0);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+
+  function lightOut(id, on, color){
+    const g = $(id);
+    if (!g) return;
+    const box = g.querySelector('.oBox');
+    const d = g.querySelector('.oDot');
+    if (box) setStroke(box, on ? color : LINE);
+    if (d) d.setAttribute('fill', on ? color : LINE);
+  }
+
+  function setWire(which, on, color){
+    const path = which === 'ticket' ? $('wireTicket') : $('wireOut');
+    const lbl = which === 'ticket' ? $('wireTicketLbl') : $('wireOutLbl');
+    path.setAttribute('stroke', on ? color : LINE);
+    path.setAttribute('opacity', on ? 1 : 0.45);
+    lbl.setAttribute('fill', on ? color : DIM);
+  }
+
+  function setField(id, on, color, value, valueColor){
+    const g = $(id);
+    if (!g) return;
+    g.setAttribute('opacity', on ? 1 : 0.45);
+    const box = g.querySelector('.fBox');
+    if (box) setStroke(box, on ? color : LINE);
+    const valId = { fieldCat:'valCat', fieldPri:'valPri', fieldConf:'valConf', fieldHum:'valHum', fieldSum:'valSum' }[id];
+    if (valId && value != null){
+      $(valId).textContent = value;
+      $(valId).setAttribute('fill', valueColor || color);
+    }
+  }
+
+  function resetFieldLabels(){
+    $('valCat').textContent = 'enum'; $('valCat').setAttribute('fill', DIM);
+    $('valPri').textContent = 'enum'; $('valPri').setAttribute('fill', DIM);
+    $('valConf').textContent = '0–1'; $('valConf').setAttribute('fill', DIM);
+    $('valHum').textContent = 'boolean'; $('valHum').setAttribute('fill', DIM);
+    $('valSum').textContent = 'string'; $('valSum').setAttribute('fill', DIM);
+  }
+
+  function render(){
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+    const past = k => idx > at(k);
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+
+    const failPhase = ['prose','proseFly','parseFail'].includes(ph.k) || (past('prose') && !reached('schemaOn'));
+    rail.forEach((r, i) => {
+      if (i < ph.step){
+        r.className = 'on' + (ph.k === 'done' ? ' done' : (failPhase && i === 2 ? ' fail' : ''));
+      } else if (i === ph.step){
+        r.className = 'on' + (ph.k === 'done' ? ' done' : (failPhase && ph.step === 2 ? ' fail' : ''));
+      } else {
+        r.className = '';
+      }
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      $(f.id).setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // --- Ticket box ---
+    const ticketHot = reached('ticket');
+    setStroke($('ticketFrame'), ph.k === 'done' ? OK : (ticketHot ? REQ : LINE));
+    setStroke($('ticketCard'), ticketHot ? REQ : LINE);
+    const ticketLines = [
+      $('ticketL1'), $('ticketL2'), $('ticketL3'), $('ticketL4')
+    ];
+    const full = ['I never got my','refund for order','#A-9021. Please','fix this ASAP.'];
+    const reveal = ph.k === 'ticket' ? local : (past('ticket') ? 1 : 0);
+    ticketLines.forEach((el, i) => {
+      const thresh = i / 4;
+      el.setAttribute('fill', reveal > thresh ? INK : DIM);
+      el.textContent = reveal > thresh ? full[i] : '····';
+    });
+
+    // --- Claude box ---
+    const claudeBusy = reached('toClaude');
+    claudeLeds.forEach((l, i) => l.setAttribute('fill', claudeBusy && Math.floor(t * 8 + i) % 3 === 0 ? TOOL : LINE));
+    const claudeFail = ['prose','proseFly','parseFail'].includes(ph.k);
+    setStroke($('claudeFrame'),
+      ph.k === 'done' || reached('validated') ? OK :
+      (claudeFail ? ERR : (claudeBusy ? TOOL : LINE)));
+
+    // Generation text
+    let g1 = 'awaiting prompt…', g2 = '', g3 = '', gFill = DIM;
+    if (ph.k === 'toClaude' || (past('toClaude') && !reached('prose'))){
+      g1 = 'prompt received'; g2 = 'no format constraint'; gFill = REQ;
+    }
+    if (ph.k === 'prose' || ph.k === 'proseFly' || ph.k === 'parseFail'){
+      const prose = 'Sure! This looks like a refund…';
+      const typed = ph.k === 'prose' ? local : 1;
+      g1 = prose.slice(0, Math.max(1, Math.round(typed * prose.length)));
+      g2 = '(friendly prose)';
+      g3 = '≠ JSON fields';
+      gFill = RES;
+    }
+    if (reached('schemaOn') && !reached('snap')){
+      g1 = 'output_config.format';
+      g2 = 'json_schema active';
+      g3 = 'tokens constrained';
+      gFill = TOOL;
+    }
+    if (reached('snap')){
+      g1 = '{ "category": "refund",';
+      g2 = '  "priority": "high",';
+      g3 = '  "confidence": 0.62 }';
+      gFill = OK;
+    }
+    $('genLine1').textContent = g1;
+    $('genLine2').textContent = g2;
+    $('genLine3').textContent = g3;
+    $('genLine1').setAttribute('fill', gFill);
+    $('genLine2').setAttribute('fill', gFill === OK ? SSE : (gFill === RES ? RES : MUTED));
+    $('genLine3').setAttribute('fill', gFill === OK ? MUTED : (gFill === RES ? ERR : DIM));
+    setStroke($('genPanel'),
+      claudeFail ? ERR :
+      (reached('snap') ? OK : (reached('schemaOn') ? TOOL : (claudeBusy ? REQ : LINE))));
+
+    // Schema card
+    const schemaLive = reached('schemaOn');
+    $('schemaCard').setAttribute('opacity', schemaLive ? 1 : 0.5);
+    setStroke($('schemaCard'), schemaLive ? TOOL : LINE);
+    $('schemaTitle').setAttribute('fill', schemaLive ? TOOL : DIM);
+
+    // Schema overlay
+    if (ph.k === 'overlay' || (ph.k === 'snap' && local < 0.35)){
+      const o = ph.k === 'overlay' ? Math.min(1, local * 3) * Math.min(1, (1 - local) * 4 + 0.4) : (1 - local / 0.35);
+      $('schemaOverlay').setAttribute('opacity', Math.max(0, o));
+    } else {
+      $('schemaOverlay').setAttribute('opacity', 0);
+    }
+
+    // Field snap sequence during 'snap' and after
+    if (!reached('schemaOn')){
+      ['fieldCat','fieldPri','fieldConf','fieldHum','fieldSum'].forEach(id => {
+        $(id).setAttribute('opacity', 0.45);
+        setStroke($(id).querySelector('.fBox'), LINE);
+      });
+      resetFieldLabels();
+    } else if (!reached('snap')){
+      ['fieldCat','fieldPri','fieldConf','fieldHum','fieldSum'].forEach(id => {
+        $(id).setAttribute('opacity', 0.75);
+        setStroke($(id).querySelector('.fBox'), TOOL);
+      });
+      resetFieldLabels();
+      $('valCat').setAttribute('fill', TOOL);
+      $('valPri').setAttribute('fill', TOOL);
+      $('valConf').setAttribute('fill', TOOL);
+      $('valHum').setAttribute('fill', TOOL);
+      $('valSum').setAttribute('fill', TOOL);
+    } else {
+      // Snap animation: fill fields one by one
+      const snapProgress = ph.k === 'snap' ? local : 1;
+      const fills = [
+        { id:'fieldCat', v:'"refund"', c:OK, at:0.05 },
+        { id:'fieldPri', v:'"high"', c:OK, at:0.25 },
+        { id:'fieldConf', v:'0.62', c:RES, at:0.45 },
+        { id:'fieldHum', v:'true', c:SSE, at:0.65 },
+        { id:'fieldSum', v:'"missed refund"', c:OK, at:0.85 },
+      ];
+      fills.forEach(f => {
+        const on = snapProgress >= f.at;
+        setField(f.id, on || past('snap'), on || past('snap') ? f.c : TOOL, on || past('snap') ? f.v : null, f.c);
+        if (!on && !past('snap')){
+          $(f.id).setAttribute('opacity', 0.75);
+          setStroke($(f.id).querySelector('.fBox'), TOOL);
+        }
+      });
+    }
+
+    // Strict badge
+    const strictOn = reached('strict');
+    const strictOp = ph.k === 'strict' ? clamp(local * 2) : (strictOn ? 1 : 0);
+    $('strictBadge').setAttribute('opacity', strictOp);
+
+    // --- Parser ---
+    const parserShow = reached('proseFly');
+    const parserFail = reached('parseFail') && !reached('schemaOn');
+    const parserOk = reached('jsonOut');
+    $('parser').setAttribute('opacity', parserShow || parserOk ? 1 : 0);
+    if (parserFail || (ph.k === 'proseFly' && local > 0.6)){
+      setStroke($('parserBg'), ERR);
+      $('parserText').textContent = 'FAIL';
+      $('parserText').setAttribute('fill', ERR);
+    } else if (parserOk){
+      setStroke($('parserBg'), OK);
+      $('parserText').textContent = 'OK';
+      $('parserText').setAttribute('fill', OK);
+    } else if (parserShow){
+      setStroke($('parserBg'), RES);
+      $('parserText').textContent = 'parser';
+      $('parserText').setAttribute('fill', RES);
+    }
+
+    // --- Switch ---
+    const switchFail = parserFail || ph.k === 'parseFail';
+    const switchOk = reached('jsonOut');
+    setStroke($('switchFrame'),
+      ph.k === 'done' ? OK :
+      (switchFail ? ERR : (switchOk ? SSE : (reached('toClaude') ? LINE : LINE))));
+
+    if (switchFail){
+      $('switchInVal').textContent = 'undefined';
+      $('switchInVal').setAttribute('fill', ERR);
+      setStroke($('switchIn'), ERR);
+      $('failBanner').setAttribute('opacity', 1);
+      lightOut('outCat', false); lightOut('outPri', false); lightOut('outHum', false); lightOut('outSum', false);
+      $('outCatSub').textContent = '—';
+      $('outPriSub').textContent = '—';
+      $('outHumSub').textContent = '—';
+      $('outSumSub').textContent = '—';
+    } else if (switchOk){
+      $('failBanner').setAttribute('opacity', 0);
+      $('switchInVal').textContent = '{ refund, high, 0.62, true… }';
+      $('switchInVal').setAttribute('fill', OK);
+      setStroke($('switchIn'), OK);
+
+      const hit = reached('switchHit');
+      const hum = reached('human');
+      lightOut('outCat', hit, OK);
+      lightOut('outPri', hit, OK);
+      lightOut('outSum', hit, OK);
+      lightOut('outHum', hum, SSE);
+      $('outCatSub').textContent = hit ? '→ refund branch' : 'refund | shipping | billing…';
+      $('outCatSub').setAttribute('fill', hit ? OK : DIM);
+      $('outPriSub').textContent = hit ? '→ high SLA' : 'high | medium | low';
+      $('outPriSub').setAttribute('fill', hit ? OK : DIM);
+      $('outSumSub').textContent = hit ? '→ "missed refund"' : 'one-line string';
+      $('outSumSub').setAttribute('fill', hit ? OK : DIM);
+      $('outHumSub').textContent = hum ? '0.62 < 0.7 → lit' : 'needs_human || conf < 0.7';
+      $('outHumSub').setAttribute('fill', hum ? SSE : DIM);
+    } else {
+      $('failBanner').setAttribute('opacity', 0);
+      $('switchInVal').textContent = 'waiting…';
+      $('switchInVal').setAttribute('fill', DIM);
+      setStroke($('switchIn'), LINE);
+      lightOut('outCat', false); lightOut('outPri', false); lightOut('outHum', false); lightOut('outSum', false);
+      $('outCatSub').textContent = 'refund | shipping | billing…';
+      $('outCatSub').setAttribute('fill', DIM);
+      $('outPriSub').textContent = 'high | medium | low';
+      $('outPriSub').setAttribute('fill', DIM);
+      $('outHumSub').textContent = 'needs_human || conf < 0.7';
+      $('outHumSub').setAttribute('fill', DIM);
+      $('outSumSub').textContent = 'one-line string';
+      $('outSumSub').setAttribute('fill', DIM);
+    }
+
+    // Wires
+    setWire('ticket', ph.wire === 'ticket' || ph.k === 'toClaude', REQ);
+    const outColor = ph.wire === 'out'
+      ? (ph.c || OK)
+      : (switchFail ? ERR : (switchOk ? OK : LINE));
+    setWire('out', ph.wire === 'out' || switchFail || switchOk, outColor);
+    if (switchFail && ph.wire !== 'out'){
+      $('wireOut').setAttribute('stroke', ERR);
+      $('wireOutLbl').setAttribute('fill', ERR);
+      $('wireOutLbl').textContent = 'undefined';
+    } else if (switchOk){
+      $('wireOutLbl').textContent = 'JSON';
+    } else {
+      $('wireOutLbl').textContent = 'JSON';
+    }
+
+    // Flying packet
+    if (ph.from){
+      const e = ease(local);
+      const x = lerp(ph.from[0], ph.to[0], e);
+      const y = lerp(ph.from[1], ph.to[1], e);
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(280, ph.label.length * 7.2 + 32);
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    // Success toast
+    if (ph.k === 'done'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = 'Schema → JSON → Switch';
+      toastText.textContent = label;
+      const w = label.length * 8.2 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('ticketFrame'), OK);
+      setStroke($('claudeFrame'), OK);
+      setStroke($('switchFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  const jump = new URLSearchParams(location.search).get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

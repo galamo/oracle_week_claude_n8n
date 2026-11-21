@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F3 — Claude tool-call loop (Messages API)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(92,200,255,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(177,140,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--tool)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+.lede strong{color:var(--ink);font-weight:500}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+.notes code.t{color:var(--tool)}
+.notes code.o{color:var(--ok)}
+.notes code.r{color:var(--res)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>F3 — <em>Claude</em> tool-call loop</h1>
+    <span class="meta">messages api · tool_use · your code runs tools</span>
+  </header>
+  <p class="lede">The tool-use loop in the Messages API. <strong>Your app</strong> POSTs to Claude with <code>tools[]</code>; Claude may reply <code class="t">stop_reason: "tool_use"</code>; <strong>your code</strong> runs the tool and POSTs <code>tool_result</code> back — Claude never executes tools itself.</p>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 560" role="img" aria-label="Claude Messages API tool-use loop: your app, Claude, and a tool exchanging messages">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+      <marker id="arrowTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b18cff"/>
+      </marker>
+      <marker id="arrowRes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ffb547"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="560" fill="url(#grid)"/>
+
+    <!-- WIRES -->
+    <g id="wires">
+      <path id="wireAC" d="M292 130 H348" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireCA" d="M348 168 H292" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowTool)" opacity=".45"/>
+      <path id="wireAT" d="M292 248 H740" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowRes)" opacity=".45"/>
+      <path id="wireTA" d="M740 286 H292" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+      <text id="wireACLbl" x="320" y="118" fill="#4d6276" font-size="10" text-anchor="middle">POST</text>
+      <text id="wireCALbl" x="320" y="188" fill="#4d6276" font-size="10" text-anchor="middle">response</text>
+      <text id="wireATLbl" x="520" y="236" fill="#4d6276" font-size="10" text-anchor="middle">app executes · not Claude</text>
+      <text id="wireTALbl" x="520" y="306" fill="#4d6276" font-size="10" text-anchor="middle">tool result → app</text>
+    </g>
+
+    <!-- LEFT: YOUR APP -->
+    <g id="app" transform="translate(0 0)">
+      <rect id="appFrame" x="28" y="36" width="264" height="280" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M28 52a18 18 0 0 1 18-16h228a18 18 0 0 1 18 16v22H28z" fill="#1d2a38"/>
+      <circle cx="50" cy="48" r="4" fill="#ff6b6b"/><circle cx="64" cy="48" r="4" fill="#ffb547"/><circle cx="78" cy="48" r="4" fill="#3ddc97"/>
+      <text x="98" y="52" fill="#8297ab" font-size="12">YOUR APP</text>
+
+      <rect x="48" y="92" width="224" height="52" rx="12" fill="#16212d" stroke="#2a3a4b"/>
+      <text x="64" y="114" fill="#8297ab" font-size="10">RUNTIME</text>
+      <text x="64" y="134" fill="#e6edf3" font-size="13">n8n · Node script</text>
+
+      <rect id="appAction" x="48" y="158" width="224" height="72" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+      <text x="64" y="182" fill="#4d6276" font-size="10">THIS TURN</text>
+      <text id="appLine1" x="64" y="204" fill="#4d6276" font-size="13">idle</text>
+      <text id="appLine2" x="64" y="222" fill="#4d6276" font-size="11"></text>
+
+      <rect id="iterBadge" x="48" y="246" width="224" height="42" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="iterText" x="160" y="272" fill="#4d6276" font-size="13" text-anchor="middle">iteration — / max 5</text>
+    </g>
+
+    <!-- CENTER: CLAUDE -->
+    <g id="claude" transform="translate(0 0)">
+      <rect id="claudeFrame" x="348" y="36" width="300" height="280" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M348 52a18 18 0 0 1 18-16h264a18 18 0 0 1 18 16v22H348z" fill="#1d2a38"/>
+      <circle class="claudeLed" cx="370" cy="48" r="4" fill="#2a3a4b"/><circle class="claudeLed" cx="384" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="404" y="52" fill="#8297ab" font-size="12">CLAUDE · Messages API</text>
+
+      <rect x="368" y="92" width="260" height="48" rx="12" fill="#16212d" stroke="#2a3a4b"/>
+      <text x="384" y="112" fill="#8297ab" font-size="10">ENDPOINT</text>
+      <text x="384" y="130" fill="#e6edf3" font-size="13">POST /v1/messages</text>
+
+      <rect id="stopCard" x="368" y="154" width="260" height="72" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+      <text x="384" y="178" fill="#4d6276" font-size="10">stop_reason</text>
+      <text id="stopReason" x="384" y="200" fill="#4d6276" font-size="14">—</text>
+      <text id="stopDetail" x="384" y="218" fill="#4d6276" font-size="11"></text>
+
+      <rect id="toolsHint" x="368" y="240" width="260" height="48" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+      <text x="384" y="260" fill="#8297ab" font-size="10">tools[]</text>
+      <text id="toolsHintTxt" x="384" y="278" fill="#4d6276" font-size="12">get_order_status</text>
+    </g>
+
+    <!-- RIGHT: TOOL -->
+    <g id="toolBox" transform="translate(0 0)">
+      <rect id="toolFrame" x="740" y="36" width="312" height="280" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M740 52a18 18 0 0 1 18-16h276a18 18 0 0 1 18 16v22H740z" fill="#1d2a38"/>
+      <circle class="toolLed" cx="762" cy="48" r="4" fill="#2a3a4b"/><circle class="toolLed" cx="776" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="796" y="52" fill="#8297ab" font-size="12">TOOL</text>
+
+      <rect id="toolCard" x="760" y="92" width="272" height="100" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".7"/>
+      <text x="776" y="116" fill="#8297ab" font-size="10">name</text>
+      <text x="776" y="138" fill="#e6edf3" font-size="15">get_order_status</text>
+      <text id="toolInput" x="776" y="164" fill="#4d6276" font-size="12">input: —</text>
+      <text id="toolId" x="776" y="182" fill="#4d6276" font-size="11">id: —</text>
+
+      <rect id="toolCard2" x="760" y="206" width="130" height="80" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".35"/>
+      <text x="825" y="236" fill="#4d6276" font-size="11" text-anchor="middle">lookup_customer</text>
+      <text x="825" y="256" fill="#4d6276" font-size="10" text-anchor="middle">parallel</text>
+
+      <rect id="toolCard3" x="902" y="206" width="130" height="80" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".35"/>
+      <text x="967" y="236" fill="#4d6276" font-size="11" text-anchor="middle">get_order_status</text>
+      <text x="967" y="256" fill="#4d6276" font-size="10" text-anchor="middle">parallel</text>
+    </g>
+
+    <!-- messages[] PANEL -->
+    <g id="msgPanel">
+      <rect id="msgFrame" x="28" y="340" width="1024" height="120" rx="16" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <text x="48" y="368" fill="#8297ab" font-size="12">messages[]</text>
+      <text id="msgHint" x="160" y="368" fill="#4d6276" font-size="11">grows each turn — Claude reads the full array</text>
+
+      <g id="chip0" opacity="0">
+        <rect x="48" y="384" width="88" height="52" rx="10" fill="#121c28" stroke="#5cc8ff"/>
+        <text x="92" y="406" fill="#5cc8ff" font-size="11" text-anchor="middle">user</text>
+        <text x="92" y="422" fill="#8297ab" font-size="10" text-anchor="middle">text</text>
+      </g>
+      <g id="chip1" opacity="0">
+        <rect x="152" y="384" width="150" height="52" rx="10" fill="#121c28" stroke="#b18cff"/>
+        <text x="227" y="406" fill="#b18cff" font-size="11" text-anchor="middle">assistant</text>
+        <text x="227" y="422" fill="#8297ab" font-size="10" text-anchor="middle">tool_use</text>
+      </g>
+      <g id="chip2" opacity="0">
+        <rect x="318" y="384" width="140" height="52" rx="10" fill="#121c28" stroke="#ffb547"/>
+        <text x="388" y="406" fill="#ffb547" font-size="11" text-anchor="middle">user</text>
+        <text x="388" y="422" fill="#8297ab" font-size="10" text-anchor="middle">tool_result</text>
+      </g>
+      <g id="chip3" opacity="0">
+        <rect x="474" y="384" width="120" height="52" rx="10" fill="#121c28" stroke="#3ddc97"/>
+        <text x="534" y="406" fill="#3ddc97" font-size="11" text-anchor="middle">assistant</text>
+        <text x="534" y="422" fill="#8297ab" font-size="10" text-anchor="middle">text</text>
+      </g>
+      <g id="chip4" opacity="0">
+        <rect x="610" y="384" width="160" height="52" rx="10" fill="#121c28" stroke="#b18cff"/>
+        <text x="690" y="406" fill="#b18cff" font-size="11" text-anchor="middle">assistant</text>
+        <text x="690" y="422" fill="#8297ab" font-size="10" text-anchor="middle">2× tool_use</text>
+      </g>
+      <g id="chip5" opacity="0">
+        <rect x="786" y="384" width="160" height="52" rx="10" fill="#121c28" stroke="#ffb547"/>
+        <text x="866" y="406" fill="#ffb547" font-size="11" text-anchor="middle">user</text>
+        <text x="866" y="422" fill="#8297ab" font-size="10" text-anchor="middle">2× tool_result</text>
+      </g>
+    </g>
+
+    <!-- TEACHING CALLOUT -->
+    <g id="callout" opacity="0">
+      <rect id="calloutBg" x="220" y="248" width="640" height="44" rx="12" fill="#121c28" stroke="#ffb547" stroke-width="2" filter="url(#glow)"/>
+      <text id="calloutText" x="540" y="276" fill="#ffb547" font-size="15" text-anchor="middle" font-weight="600">Claude never runs the tool — your code does.</text>
+    </g>
+
+    <!-- FLYING PACKET -->
+    <g id="packet" opacity="0" filter="url(#glow)">
+      <rect id="pill" x="-70" y="-18" width="140" height="36" rx="18" fill="#0f1720" stroke="#5cc8ff" stroke-width="2"/>
+      <text id="pillText" x="0" y="5" text-anchor="middle" fill="#5cc8ff" font-size="12" font-weight="500">packet</text>
+      <circle id="dot" cx="0" cy="28" r="5" fill="#5cc8ff"/>
+    </g>
+
+    <!-- SUCCESS TOAST -->
+    <g id="toast" opacity="0">
+      <g id="toastInner" transform="translate(540 200)">
+        <rect id="toastBg" x="-180" y="-22" width="360" height="44" rx="22" fill="#0f1720" stroke="#3ddc97" stroke-width="2"/>
+        <circle cx="-154" cy="0" r="10" fill="none" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M-159 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="toastText" x="14" y="5" text-anchor="middle" fill="#3ddc97" font-size="14" font-weight="500">loop complete</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <div class="n" id="stepN">0</div>
+    <p id="stepText">Loading…</p>
+  </div>
+
+  <div class="rail" id="rail" aria-hidden="true">
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="primary" id="play">Pause</button>
+    <button type="button" id="replay">Replay</button>
+    <div class="sound">
+      <span>Sound</span>
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed">
+      <span>Speed</span>
+      <button type="button" data-s="0.5">0.5x</button>
+      <button type="button" data-s="1" aria-pressed="true">1x</button>
+      <button type="button" data-s="1.5">1.5x</button>
+    </div>
+  </div>
+
+  <section class="anatomy">
+    <h2>At a glance</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 220" role="img" aria-label="Tool-use loop as a circle with four labelled arrows">
+        <rect width="1080" height="220" fill="#16212d"/>
+        <circle cx="540" cy="110" r="72" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+        <text x="540" y="106" fill="#e6edf3" font-size="13" text-anchor="middle" font-weight="600">tool-use</text>
+        <text x="540" y="124" fill="#8297ab" font-size="11" text-anchor="middle">loop</text>
+
+        <!-- 1 top: POST messages -->
+        <path class="pipe-flow" d="M420 50 A120 120 0 0 1 660 50" fill="none" stroke="#5cc8ff" stroke-width="2"/>
+        <path d="M652 42 l10 10 l-14 2" fill="none" stroke="#5cc8ff" stroke-width="1.8"/>
+        <text x="540" y="28" fill="#5cc8ff" font-size="12" text-anchor="middle">1 · POST /v1/messages</text>
+
+        <!-- 2 right: tool_use -->
+        <path class="pipe-flow" d="M660 50 A120 120 0 0 1 660 170" fill="none" stroke="#b18cff" stroke-width="2"/>
+        <path d="M668 162 l-10 10 l-2-14" fill="none" stroke="#b18cff" stroke-width="1.8"/>
+        <text x="790" y="114" fill="#b18cff" font-size="12" text-anchor="middle">2 · tool_use</text>
+
+        <!-- 3 bottom: app executes -->
+        <path class="pipe-flow" d="M660 170 A120 120 0 0 1 420 170" fill="none" stroke="#ffb547" stroke-width="2"/>
+        <path d="M428 178 l-10-10 l14-2" fill="none" stroke="#ffb547" stroke-width="1.8"/>
+        <text x="540" y="208" fill="#ffb547" font-size="12" text-anchor="middle">3 · your app runs the tool</text>
+
+        <!-- 4 left: tool_result → end_turn -->
+        <path class="pipe-flow" d="M420 170 A120 120 0 0 1 420 50" fill="none" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M412 58 l10-10 l2 14" fill="none" stroke="#3ddc97" stroke-width="1.8"/>
+        <text x="290" y="114" fill="#3ddc97" font-size="12" text-anchor="middle">4 · tool_result → end_turn</text>
+
+        <rect x="40" y="70" width="160" height="80" rx="12" fill="#0f1720" stroke="#5cc8ff"/>
+        <text x="120" y="106" fill="#5cc8ff" font-size="13" text-anchor="middle">YOUR APP</text>
+        <text x="120" y="126" fill="#8297ab" font-size="10" text-anchor="middle">owns the loop</text>
+
+        <rect x="880" y="70" width="160" height="80" rx="12" fill="#0f1720" stroke="#b18cff"/>
+        <text x="960" y="106" fill="#b18cff" font-size="13" text-anchor="middle">CLAUDE</text>
+        <text x="960" y="126" fill="#8297ab" font-size="10" text-anchor="middle">requests · never runs</text>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>Claude only requests</strong>A <code class="t">tool_use</code> block is a request: name + input + id. Claude stops with <code>stop_reason: "tool_use"</code> and waits for you.</p>
+      <p><strong>Your app executes</strong>Look up the tool by name, run it with the input, then append a <code class="r">tool_result</code> message that references the same <code>tool_use_id</code>.</p>
+      <p><strong>Loop until end_turn</strong>POST the growing <code>messages[]</code> again. Claude may emit more <code class="t">tool_use</code> blocks (even in parallel) or finish with <code class="o">stop_reason: "end_turn"</code>.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', LINE = '#2a3a4b';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+  const claudeLeds = [...document.querySelectorAll('.claudeLed')];
+  const toolLeds = [...document.querySelectorAll('.toolLed')];
+
+  const floaters = [
+    { id: 'app', amp: 2.2, speed: 0.2, phase: 0.3 },
+    { id: 'claude', amp: 1.8, speed: 0.17, phase: 1.4 },
+    { id: 'toolBox', amp: 2.0, speed: 0.15, phase: 2.1 },
+  ];
+
+  /*
+   * Phase array — edit `txt` captions freely.
+   * k: key for ?at=<k> deep links
+   * d: duration (seconds)
+   * step: progress-rail index (1..8)
+   * from/to: packet flight [x,y] in SVG space
+   * label/c/wire: packet pill + wire highlight
+   * tone: whoosh | blip | chime | soft | resolve | rest
+   */
+  const P = [
+    // Settle: three actors
+    { k:'idle', d:1.4, step:0,
+      txt:'Three actors: <strong>YOUR APP</strong> (n8n / Node), <strong>CLAUDE</strong> (Messages API), and a <code class="t">TOOL</code>. Claude never calls the tool — your code does.',
+      tone:'rest' },
+
+    // 1 — App POSTs first turn with tools[] + user message
+    { k:'post1', d:2.3, step:1, from:[292,130], to:[368,130],
+      label:'POST /v1/messages', c:REQ, wire:'ac',
+      txt:'App → Claude: <code>POST /v1/messages</code> with <code class="t">tools[]</code> and a user message (“Where is order 1042?”). Appends <code>role: user</code> to <code>messages[]</code>.',
+      tone:'whoosh' },
+
+    // 2 — Claude returns tool_use
+    { k:'toolUse', d:2.5, step:2, from:[368,168], to:[292,168],
+      label:'stop_reason: tool_use', c:TOOL, wire:'ca',
+      txt:'Claude → App: <code class="t">stop_reason: "tool_use"</code> with <code class="t">{id:"toolu_01", name:"get_order_status", input:{order_id:"1042"}}</code>. Chip: assistant · tool_use.',
+      tone:'chime' },
+
+    // 3 — App executes the tool (critical teaching)
+    { k:'exec', d:2.3, step:3, from:[292,248], to:[760,180],
+      label:'execute get_order_status', c:RES, wire:'at',
+      txt:'App (not Claude) looks up <code class="t">get_order_status</code> and runs it with <code>{order_id:"1042"}</code>. The wire skips Claude on purpose.',
+      tone:'whoosh' },
+
+    // Tool data returns to app
+    { k:'toolData', d:1.8, step:3, from:[760,286], to:[292,286],
+      label:'{status:"shipped"}', c:OK, wire:'ta',
+      txt:'Tool → App: structured result, e.g. <code class="o">{status:"shipped", eta:"Tue"}</code>. Still no Claude involvement.',
+      tone:'blip' },
+
+    // 4 — App POSTs tool_result
+    { k:'post2', d:2.3, step:4, from:[292,130], to:[368,130],
+      label:'POST · tool_result', c:REQ, wire:'ac',
+      txt:'App → Claude: POST again. Append <code class="r">role: user</code> with <code class="r">tool_result</code> referencing <code>tool_use_id: "toolu_01"</code>. Full <code>messages[]</code> is resent.',
+      tone:'whoosh' },
+
+    // 5 — Claude end_turn
+    { k:'endTurn', d:2.3, step:5, from:[368,168], to:[292,168],
+      label:'stop_reason: end_turn', c:OK, wire:'ca',
+      txt:'Claude → App: <code class="o">stop_reason: "end_turn"</code> with final assistant text (“Order 1042 shipped, ETA Tuesday.”). Loop can stop.',
+      tone:'chime' },
+
+    // 6 — Teaching callout + iteration badge
+    { k:'callout', d:2.8, step:6,
+      txt:'Critical point: <strong style="color:var(--res)">Claude never runs the tool — your code does.</strong> Badge: <code class="s">iteration 1 / max 5</code> — cap the loop in your agent.',
+      tone:'soft' },
+
+    // 7 — Second cycle: POST next turn
+    { k:'post3', d:1.9, step:7, from:[292,130], to:[368,130],
+      label:'POST · next turn', c:REQ, wire:'ac',
+      txt:'Second cycle: App POSTs again (e.g. “Also look up the customer”). Claude may request <em>several</em> tools in one response.',
+      tone:'whoosh' },
+
+    // Parallel tool_use blocks
+    { k:'parallel', d:2.4, step:7, from:[368,168], to:[292,168],
+      label:'2× tool_use', c:TOOL, wire:'ca',
+      txt:'Claude returns <strong>two</strong> <code class="t">tool_use</code> blocks in one message: <code class="t">lookup_customer</code> + <code class="t">get_order_status</code>. One stop_reason, parallel requests.',
+      tone:'chime' },
+
+    // 8 — App runs both in parallel
+    { k:'exec2', d:2.2, step:8, from:[292,248], to:[830,230],
+      label:'parallel exec ×2', c:RES, wire:'at',
+      txt:'App runs both tools (Promise.all / parallel nodes), then POSTs <strong>two</strong> <code class="r">tool_result</code> blocks. Cap iterations — here <code class="s">2 / max 5</code>.',
+      tone:'whoosh' },
+
+    // Done
+    { k:'done', d:3.0, step:8,
+      txt:'Pattern: <strong>POST → tool_use → your code → tool_result → POST</strong> until <code class="o">end_turn</code>. Claude requests; your app executes.',
+      tone:'resolve' },
+  ];
+
+  const at = k => P.findIndex(p => p.k === k);
+  const total = P.reduce((a, p) => a + p.d, 0);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+
+  function setWire(which, on, color){
+    const map = {
+      ac: ['wireAC', 'wireACLbl'],
+      ca: ['wireCA', 'wireCALbl'],
+      at: ['wireAT', 'wireATLbl'],
+      ta: ['wireTA', 'wireTALbl'],
+    };
+    const ids = map[which];
+    if (!ids) return;
+    const path = $(ids[0]), lbl = $(ids[1]);
+    path.setAttribute('stroke', on ? color : LINE);
+    path.setAttribute('opacity', on ? 1 : 0.45);
+    lbl.setAttribute('fill', on ? color : '#4d6276');
+  }
+
+  function setChip(i, on){
+    const g = $('chip' + i);
+    if (g) g.setAttribute('opacity', on ? 1 : 0);
+  }
+
+  function render(){
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+    rail.forEach((r, i) => {
+      r.className = i < ph.step ? 'on' + (ph.k === 'done' ? ' done' : '') : '';
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      $(f.id).setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // Frames
+    const appHot = ['post1','exec','toolData','post2','callout','post3','exec2','done'].includes(ph.k) || ph.wire === 'ac' || ph.wire === 'at';
+    const claudeHot = ['post1','toolUse','post2','endTurn','post3','parallel','done'].includes(ph.k) || ph.wire === 'ca';
+    const toolHot = ['exec','toolData','exec2','parallel','done'].includes(ph.k) || ph.wire === 'at' || ph.wire === 'ta';
+
+    setStroke($('appFrame'), ph.k === 'done' ? OK : (appHot || reached('post1') ? REQ : LINE));
+    setStroke($('claudeFrame'), ph.k === 'done' ? OK : (claudeHot || reached('post1') ? TOOL : LINE));
+    setStroke($('toolFrame'), ph.k === 'done' ? OK : (toolHot || reached('exec') ? RES : LINE));
+    setStroke($('msgFrame'), reached('post1') ? REQ : LINE);
+
+    claudeLeds.forEach((l, i) => l.setAttribute('fill', reached('post1') && Math.floor(t * 8 + i) % 3 === 0 ? TOOL : LINE));
+    toolLeds.forEach((l, i) => l.setAttribute('fill', reached('exec') && Math.floor(t * 8 + i) % 3 === 0 ? RES : LINE));
+
+    // App action card
+    $('appAction').setAttribute('opacity', reached('post1') ? 1 : 0.7);
+    setStroke($('appAction'), appHot ? REQ : LINE);
+    const appLabels = {
+      post1: ['POST /v1/messages', 'tools[] + user text'],
+      toolUse: ['got tool_use', 'will execute locally'],
+      exec: ['running tool…', 'get_order_status'],
+      toolData: ['got tool data', 'building tool_result'],
+      post2: ['POST tool_result', 'toolu_01'],
+      endTurn: ['got final text', 'end_turn'],
+      callout: ['owns the loop', 'iteration 1 / max 5'],
+      post3: ['POST next turn', 'ask for more'],
+      parallel: ['2 tool requests', 'run both locally'],
+      exec2: ['parallel exec ×2', 'iteration 2 / max 5'],
+      done: ['loop complete', 'app executed every tool'],
+    };
+    const al = appLabels[ph.k] || (reached('callout')
+      ? ['looping', '']
+      : (reached('post1') ? ['in flight', ''] : ['idle', '']));
+    $('appLine1').textContent = al[0];
+    $('appLine1').setAttribute('fill', reached('post1') ? '#e6edf3' : '#4d6276');
+    $('appLine2').textContent = al[1] || '';
+    $('appLine2').setAttribute('fill', reached('post1') ? OK : '#4d6276');
+
+    // Iteration badge
+    let iterLabel = 'iteration — / max 5';
+    let iterColor = '#4d6276';
+    if (reached('exec2') || ph.k === 'done'){ iterLabel = 'iteration 2 / max 5'; iterColor = SSE; }
+    else if (reached('callout')){ iterLabel = 'iteration 1 / max 5'; iterColor = SSE; }
+    else if (reached('post1')){ iterLabel = 'iteration 1 / max 5'; iterColor = '#8297ab'; }
+    $('iterText').textContent = iterLabel;
+    $('iterText').setAttribute('fill', iterColor);
+    setStroke($('iterBadge'), reached('callout') ? SSE : LINE);
+
+    // Claude stop_reason
+    $('stopCard').setAttribute('opacity', reached('toolUse') ? 1 : 0.7);
+    let stop = '—', stopDetail = '', stopColor = '#4d6276', stopStroke = LINE;
+    if (ph.k === 'toolUse' || (reached('toolUse') && !reached('endTurn'))){
+      stop = '"tool_use"'; stopDetail = 'toolu_01 · get_order_status'; stopColor = TOOL; stopStroke = TOOL;
+    }
+    if (ph.k === 'endTurn' || (reached('endTurn') && !reached('parallel'))){
+      stop = '"end_turn"'; stopDetail = 'final assistant text'; stopColor = OK; stopStroke = OK;
+    }
+    if (ph.k === 'parallel' || (reached('parallel') && ph.k !== 'done' && !reached('done'))){
+      stop = '"tool_use"'; stopDetail = '2 blocks · parallel'; stopColor = TOOL; stopStroke = TOOL;
+    }
+    if (ph.k === 'done'){
+      stop = '"end_turn"'; stopDetail = 'loop finished'; stopColor = OK; stopStroke = OK;
+    }
+    $('stopReason').textContent = stop;
+    $('stopReason').setAttribute('fill', stopColor);
+    $('stopDetail').textContent = stopDetail;
+    $('stopDetail').setAttribute('fill', stopColor === '#4d6276' ? '#4d6276' : '#8297ab');
+    setStroke($('stopCard'), stopStroke);
+
+    setStroke($('toolsHint'), reached('post1') ? TOOL : LINE);
+    $('toolsHintTxt').setAttribute('fill', reached('post1') ? '#e6edf3' : '#4d6276');
+    $('toolsHintTxt').textContent = reached('parallel') ? 'lookup_customer · get_order_status' : 'get_order_status';
+
+    // Tool cards
+    const toolActive = reached('exec');
+    $('toolCard').setAttribute('opacity', toolActive ? 1 : 0.7);
+    setStroke($('toolCard'), (ph.k === 'exec' || ph.k === 'toolData' || (reached('exec') && !reached('parallel'))) ? RES : (reached('exec') ? TOOL : LINE));
+    if (ph.k === 'toolUse' || reached('toolUse')){
+      $('toolInput').textContent = 'input: {order_id:"1042"}';
+      $('toolId').textContent = 'id: toolu_01';
+      $('toolInput').setAttribute('fill', '#e6edf3');
+      $('toolId').setAttribute('fill', TOOL);
+    } else {
+      $('toolInput').textContent = 'input: —';
+      $('toolId').textContent = 'id: —';
+      $('toolInput').setAttribute('fill', '#4d6276');
+      $('toolId').setAttribute('fill', '#4d6276');
+    }
+    if (ph.k === 'toolData' || (reached('toolData') && !reached('parallel'))){
+      $('toolInput').textContent = 'result: {status:"shipped"}';
+      $('toolInput').setAttribute('fill', OK);
+    }
+
+    const parallelOn = reached('parallel');
+    $('toolCard2').setAttribute('opacity', parallelOn ? 1 : 0.35);
+    $('toolCard3').setAttribute('opacity', parallelOn ? 1 : 0.35);
+    setStroke($('toolCard2'), ph.k === 'exec2' || ph.k === 'parallel' || ph.k === 'done' ? TOOL : LINE);
+    setStroke($('toolCard3'), ph.k === 'exec2' || ph.k === 'parallel' || ph.k === 'done' ? RES : LINE);
+
+    // messages[] chips
+    setChip(0, reached('post1'));
+    setChip(1, reached('toolUse'));
+    setChip(2, reached('post2'));
+    setChip(3, reached('endTurn'));
+    setChip(4, reached('parallel'));
+    setChip(5, reached('exec2'));
+    $('msgHint').setAttribute('fill', reached('post1') ? '#8297ab' : '#4d6276');
+
+    // Wires
+    setWire('ac', ph.wire === 'ac' || ['post1','post2','post3'].includes(ph.k), REQ);
+    setWire('ca', ph.wire === 'ca' || ['toolUse','endTurn','parallel'].includes(ph.k), TOOL);
+    setWire('at', ph.wire === 'at' || ['exec','exec2'].includes(ph.k), RES);
+    setWire('ta', ph.wire === 'ta' || ph.k === 'toolData', OK);
+    if (ph.k === 'callout' || ph.k === 'done'){
+      setWire('at', true, RES);
+    }
+
+    // Teaching callout
+    if (ph.k === 'callout' || ph.k === 'done'){
+      const s = ph.k === 'callout' ? clamp(lt / 0.4) : 1;
+      const out = ph.k === 'callout' ? clamp((lt - (ph.d - 0.5)) / 0.4) : (ph.k === 'done' ? 0 : 0);
+      $('callout').setAttribute('opacity', s * (1 - out * 0.3));
+    } else if (reached('callout') && !reached('done') && idx < at('done')){
+      $('callout').setAttribute('opacity', ph.k === 'post3' || ph.k === 'parallel' || ph.k === 'exec2' ? 0.35 : 0);
+    } else {
+      $('callout').setAttribute('opacity', 0);
+    }
+
+    // Flying packet
+    if (ph.from){
+      const e = ease(local);
+      const x = lerp(ph.from[0], ph.to[0], e);
+      const y = lerp(ph.from[1], ph.to[1], e);
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(300, ph.label.length * 7.2 + 32);
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    // Success toast
+    if (ph.k === 'done'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = 'Claude requests · your app runs tools';
+      toastText.textContent = label;
+      const w = label.length * 8.0 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('appFrame'), OK);
+      setStroke($('claudeFrame'), OK);
+      setStroke($('toolFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  const jump = new URLSearchParams(location.search).get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

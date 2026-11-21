@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F2 — Three-layer architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#0f1720;
+  --panel:#16212d;
+  --line:#2a3a4b;
+  --ink:#e6edf3;
+  --muted:#8297ab;
+  --dim:#4d6276;
+  --req:#5cc8ff;
+  --res:#ffb547;
+  --ok:#3ddc97;
+  --tool:#b18cff;
+  --sse:#5eead4;
+  --err:#ff6b6b;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ground);color:var(--ink)}
+body{
+  font-family:var(--mono);
+  margin:0;
+  padding:28px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left));
+  background-image:
+    radial-gradient(ellipse 70% 45% at 8% -8%, rgba(255,181,71,.07), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 92% 0%, rgba(92,200,255,.05), transparent 50%);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,3.2vw,2.15rem);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--res)}
+.meta{color:var(--muted);font-size:.78rem;letter-spacing:.07em;text-transform:uppercase}
+.lede{margin:-4px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55;max-width:78ch}
+.lede code{color:var(--req)}
+
+.stage{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+}
+.stage svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--mono)}
+
+.caption{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;min-height:3.6em}
+.caption .n{font-family:var(--display);font-size:2rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;width:2.2ch}
+.caption p{margin:0;font-size:.95rem;line-height:1.5}
+.caption code{color:var(--req)}
+.caption code.r{color:var(--res)}
+.caption code.t{color:var(--tool)}
+.caption code.o{color:var(--ok)}
+.caption code.s{color:var(--sse)}
+
+.rail{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.rail div{height:4px;border-radius:2px;background:var(--line);transition:background .35s}
+.rail div.on{background:var(--req)}
+.rail div.on.done{background:var(--ok)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{
+  font:500 .85rem var(--mono);
+  color:var(--ink);
+  background:transparent;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 16px;
+  cursor:pointer;
+  letter-spacing:.03em;
+}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--req);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.speed{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.speed button{padding:6px 10px}
+.speed button[aria-pressed="true"]{border-color:var(--req);color:var(--req)}
+.sound{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:.8rem}
+.sound button[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+@media (max-width:560px){.speed,.sound{margin-left:0}}
+
+.anatomy{border-top:1px solid var(--line);padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.anatomy h2{margin:0;font-family:var(--display);font-weight:500;font-size:1.15rem}
+.flow{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.flow svg{display:block;width:100%;height:auto}
+.pipe-flow{stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.pipe-flow{animation:none}}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;font-size:.82rem;line-height:1.55;color:var(--muted)}
+.notes strong{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+.notes code{color:var(--req)}
+.notes code.r{color:var(--res)}
+.notes code.t{color:var(--tool)}
+.notes code.o{color:var(--ok)}
+@media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>F2 — <em>Three-layer</em> architecture</h1>
+    <span class="meta">trigger · reason · act · write back</span>
+  </header>
+  <p class="lede">One automation, three layers: <strong style="color:var(--res);font-weight:500">n8n</strong> orchestrates, <strong style="color:var(--req);font-weight:500">Claude</strong> reasons, <strong style="color:var(--tool);font-weight:500">MCP</strong> acts on systems. Flow: webhook → prompt → tool call → decision JSON → Switch → write-back → reply.</p>
+
+  <div class="stage">
+  <svg viewBox="0 0 1080 520" role="img" aria-label="Four columns: n8n orchestration, Claude reasoning, MCP tools, and backend systems with packets flying through a trigger-reason-act-write-back loop">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+        <path d="M28 0H0V28" fill="none" stroke="#1a2735" stroke-width="1"/>
+      </pattern>
+      <marker id="arrowRes" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#ffb547"/>
+      </marker>
+      <marker id="arrowReq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#5cc8ff"/>
+      </marker>
+      <marker id="arrowTool" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b18cff"/>
+      </marker>
+      <marker id="arrowOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3ddc97"/>
+      </marker>
+    </defs>
+    <rect width="1080" height="520" fill="url(#grid)"/>
+
+    <!-- Wires between columns -->
+    <g id="wires">
+      <path id="wireN8nClaude" d="M262 200 H290" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowReq)" opacity=".45"/>
+      <path id="wireClaudeN8n" d="M290 280 H262" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowRes)" opacity=".45"/>
+      <path id="wireN8nMcp" d="M526 200 H554" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowTool)" opacity=".45"/>
+      <path id="wireMcpSys" d="M790 200 H818" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowOk)" opacity=".45"/>
+      <path id="wireSysMcp" d="M818 280 H790" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowTool)" opacity=".45"/>
+      <path id="wireMcpN8n" d="M554 280 H526" fill="none" stroke="#2a3a4b" stroke-width="2.5" stroke-dasharray="6 8" marker-end="url(#arrowRes)" opacity=".45"/>
+      <text id="wireN8nClaudeLbl" x="276" y="188" fill="#4d6276" font-size="9" text-anchor="middle">prompt</text>
+      <text id="wireClaudeN8nLbl" x="276" y="268" fill="#4d6276" font-size="9" text-anchor="middle">JSON</text>
+      <text id="wireN8nMcpLbl" x="540" y="188" fill="#4d6276" font-size="9" text-anchor="middle">MCP client</text>
+      <text id="wireMcpSysLbl" x="804" y="188" fill="#4d6276" font-size="9" text-anchor="middle">tool → data</text>
+    </g>
+
+    <!-- COL 1: ORCHESTRATION (n8n) -->
+    <g id="colN8n" transform="translate(0 0)">
+      <rect id="n8nFrame" x="20" y="36" width="242" height="448" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M20 52a18 18 0 0 1 18-16h206a18 18 0 0 1 18 16v22H20z" fill="#1d2a38"/>
+      <circle class="n8nLed" cx="42" cy="48" r="4" fill="#2a3a4b"/>
+      <circle class="n8nLed" cx="56" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="74" y="52" fill="#8297ab" font-size="11">ORCHESTRATION</text>
+      <text x="242" y="52" fill="#4d6276" font-size="10" text-anchor="end">n8n</text>
+
+      <g id="nodeWebhook">
+        <rect class="nBox" x="40" y="96" width="202" height="72" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="56" y="118" fill="#4d6276" font-size="10">WEBHOOK TRIGGER</text>
+        <text id="webhookLine" x="56" y="142" fill="#4d6276" font-size="12">waiting…</text>
+        <text id="webhookSub" x="56" y="158" fill="#4d6276" font-size="10"></text>
+      </g>
+
+      <g id="nodeSwitch">
+        <rect class="nBox" x="40" y="188" width="202" height="72" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="56" y="210" fill="#4d6276" font-size="10">SWITCH</text>
+        <text id="switchLine" x="56" y="234" fill="#4d6276" font-size="12">idle</text>
+        <text id="switchSub" x="56" y="250" fill="#4d6276" font-size="10">by category</text>
+      </g>
+
+      <g id="nodeTable">
+        <rect class="nBox" x="40" y="280" width="202" height="72" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="56" y="302" fill="#4d6276" font-size="10">DATA TABLE</text>
+        <text id="tableLine" x="56" y="326" fill="#4d6276" font-size="12">no write yet</text>
+        <text id="tableSub" x="56" y="342" fill="#4d6276" font-size="10">tickets · audit</text>
+      </g>
+
+      <g id="nodeMcpClient">
+        <rect class="nBox" x="40" y="372" width="202" height="56" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="56" y="394" fill="#4d6276" font-size="10">MCP CLIENT TOOL</text>
+        <text id="mcpClientLine" x="56" y="414" fill="#4d6276" font-size="11">AI Agent → tools</text>
+      </g>
+
+      <text x="141" y="460" fill="#ffb547" font-size="12" text-anchor="middle" letter-spacing="1.5" opacity=".7">n8n</text>
+    </g>
+
+    <!-- COL 2: REASONING (Claude) -->
+    <g id="colClaude" transform="translate(0 0)">
+      <rect id="claudeFrame" x="290" y="36" width="236" height="448" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M290 52a18 18 0 0 1 18-16h200a18 18 0 0 1 18 16v22H290z" fill="#1d2a38"/>
+      <circle class="claudeLed" cx="312" cy="48" r="4" fill="#2a3a4b"/>
+      <circle class="claudeLed" cx="326" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="344" y="52" fill="#8297ab" font-size="11">REASONING</text>
+      <text x="506" y="52" fill="#4d6276" font-size="10" text-anchor="end">Claude</text>
+
+      <g id="nodePrompt">
+        <rect class="nBox" x="310" y="96" width="196" height="100" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="326" y="118" fill="#4d6276" font-size="10">SYSTEM PROMPT</text>
+        <text id="promptLine1" x="326" y="144" fill="#4d6276" font-size="12">triage assistant</text>
+        <text id="promptLine2" x="326" y="164" fill="#4d6276" font-size="11">classify · tool use</text>
+        <text id="promptLine3" x="326" y="182" fill="#4d6276" font-size="10">JSON only</text>
+      </g>
+
+      <g id="nodeSchema">
+        <rect class="nBox" x="310" y="216" width="196" height="120" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="326" y="238" fill="#4d6276" font-size="10">JSON SCHEMA</text>
+        <text id="schemaCat" x="326" y="264" fill="#4d6276" font-size="12">category: enum</text>
+        <text id="schemaPri" x="326" y="284" fill="#4d6276" font-size="12">priority: enum</text>
+        <text id="schemaConf" x="326" y="304" fill="#4d6276" font-size="12">confidence: 0–1</text>
+        <text id="schemaSum" x="326" y="324" fill="#4d6276" font-size="11">summary: string</text>
+      </g>
+
+      <g id="nodeDecision">
+        <rect class="nBox" x="310" y="356" width="196" height="80" rx="12" fill="#121c28" stroke="#2a3a4b" opacity=".55"/>
+        <text x="326" y="378" fill="#4d6276" font-size="10">DECISION</text>
+        <text id="decisionLine" x="326" y="402" fill="#4d6276" font-size="12">awaiting…</text>
+        <text id="decisionSub" x="326" y="420" fill="#4d6276" font-size="10"></text>
+      </g>
+
+      <text x="408" y="460" fill="#5cc8ff" font-size="12" text-anchor="middle" letter-spacing="1.5" opacity=".7">Claude</text>
+    </g>
+
+    <!-- COL 3: TOOLS (MCP) -->
+    <g id="colMcp" transform="translate(0 0)">
+      <rect id="mcpFrame" x="554" y="36" width="236" height="448" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M554 52a18 18 0 0 1 18-16h200a18 18 0 0 1 18 16v22H554z" fill="#1d2a38"/>
+      <circle class="mcpLed" cx="576" cy="48" r="4" fill="#2a3a4b"/>
+      <circle class="mcpLed" cx="590" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="608" y="52" fill="#8297ab" font-size="11">TOOLS</text>
+      <text x="770" y="52" fill="#4d6276" font-size="10" text-anchor="end">MCP server</text>
+
+      <g id="tool0">
+        <rect class="tBox" x="574" y="96" width="196" height="56" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="tDot" cx="594" cy="116" r="5" fill="#2a3a4b"/>
+        <text x="608" y="120" fill="#e6edf3" font-size="12" font-weight="600">lookup_customer</text>
+        <text x="594" y="140" fill="#4d6276" font-size="10">CRM · by email</text>
+      </g>
+      <g id="tool1">
+        <rect class="tBox" x="574" y="168" width="196" height="56" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="tDot" cx="594" cy="188" r="5" fill="#2a3a4b"/>
+        <text x="608" y="192" fill="#e6edf3" font-size="12" font-weight="600">get_order</text>
+        <text x="594" y="212" fill="#4d6276" font-size="10">order_id → status</text>
+      </g>
+      <g id="tool2">
+        <rect class="tBox" x="574" y="240" width="196" height="56" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="tDot" cx="594" cy="260" r="5" fill="#2a3a4b"/>
+        <text x="608" y="264" fill="#e6edf3" font-size="12" font-weight="600">search_kb</text>
+        <text x="594" y="284" fill="#4d6276" font-size="10">KB · policy hits</text>
+      </g>
+      <g id="tool3">
+        <rect class="tBox" x="574" y="312" width="196" height="56" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+        <circle class="tDot" cx="594" cy="332" r="5" fill="#2a3a4b"/>
+        <text x="608" y="336" fill="#e6edf3" font-size="12" font-weight="600">create_ticket</text>
+        <text x="594" y="356" fill="#4d6276" font-size="10">write · ticket table</text>
+      </g>
+
+      <rect id="mcpBadge" x="574" y="392" width="196" height="44" rx="10" fill="#121c28" stroke="#2a3a4b"/>
+      <text id="mcpBadgeText" x="672" y="418" fill="#4d6276" font-size="11" text-anchor="middle">ops-mcp :3200/mcp</text>
+
+      <text x="672" y="460" fill="#b18cff" font-size="12" text-anchor="middle" letter-spacing="1.5" opacity=".7">MCP</text>
+    </g>
+
+    <!-- COL 4: SYSTEMS -->
+    <g id="colSys" transform="translate(0 0)">
+      <rect id="sysFrame" x="818" y="36" width="242" height="448" rx="18" fill="#0f1720" stroke="#2a3a4b" stroke-width="2"/>
+      <path d="M818 52a18 18 0 0 1 18-16h206a18 18 0 0 1 18 16v22H818z" fill="#1d2a38"/>
+      <circle class="sysLed" cx="840" cy="48" r="4" fill="#2a3a4b"/>
+      <circle class="sysLed" cx="854" cy="48" r="4" fill="#2a3a4b"/>
+      <text x="872" y="52" fill="#8297ab" font-size="11">SYSTEMS</text>
+      <text x="1040" y="52" fill="#4d6276" font-size="10" text-anchor="end">data</text>
+
+      <g id="sysCrm">
+        <rect class="sBox" x="838" y="96" width="202" height="88" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="854" y="118" fill="#4d6276" font-size="10">CRM JSON</text>
+        <text id="crmLine" x="854" y="144" fill="#4d6276" font-size="12">customers.json</text>
+        <text id="crmSub" x="854" y="164" fill="#4d6276" font-size="10">id · tier · email</text>
+      </g>
+      <g id="sysKb">
+        <rect class="sBox" x="838" y="204" width="202" height="88" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="854" y="226" fill="#4d6276" font-size="10">KB FILES</text>
+        <text id="kbLine" x="854" y="252" fill="#4d6276" font-size="12">policies/*.md</text>
+        <text id="kbSub" x="854" y="272" fill="#4d6276" font-size="10">refund · shipping</text>
+      </g>
+      <g id="sysTickets">
+        <rect class="sBox" x="838" y="312" width="202" height="100" rx="12" fill="#121c28" stroke="#2a3a4b"/>
+        <text x="854" y="334" fill="#4d6276" font-size="10">TICKET TABLE</text>
+        <text id="ticketLine" x="854" y="360" fill="#4d6276" font-size="12">no rows yet</text>
+        <text id="ticketSub" x="854" y="380" fill="#4d6276" font-size="10">category · owner</text>
+        <text id="ticketSub2" x="854" y="398" fill="#4d6276" font-size="10"></text>
+      </g>
+
+      <text x="939" y="460" fill="#3ddc97" font-size="12" text-anchor="middle" letter-spacing="1.5" opacity=".7">systems</text>
+    </g>
+
+    <!-- Flying packet: pill + who-label + glowing dot -->
+    <g id="packet" opacity="0">
+      <rect id="pill" x="-90" y="-48" width="180" height="26" rx="13" fill="#16212d" stroke="#5cc8ff" stroke-width="1.6"/>
+      <text id="pillText" x="0" y="-30" fill="#5cc8ff" font-size="11" font-weight="500" text-anchor="middle"></text>
+      <text id="whoText" x="0" y="-8" fill="#8297ab" font-size="9" text-anchor="middle"></text>
+      <circle id="dot" r="8" fill="#5cc8ff" filter="url(#glow)"/>
+    </g>
+
+    <g id="toast" opacity="0" transform="translate(540 52)">
+      <g id="toastInner">
+        <rect id="toastBg" x="-130" y="-22" width="260" height="44" rx="22" fill="#3ddc97" filter="url(#glow)"/>
+        <circle cx="-104" cy="0" r="12" fill="#0f1720"/>
+        <path d="M-109 0l4 4 8-9" fill="none" stroke="#3ddc97" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="toastText" x="10" y="5" fill="#0f1720" font-size="14" font-weight="600" text-anchor="middle">3 layers · 1 automation</text>
+      </g>
+    </g>
+  </svg>
+  </div>
+
+  <div class="caption" aria-live="polite">
+    <span class="n" id="stepN">0</span>
+    <p id="stepText">Four columns: n8n orchestrates, Claude reasons, MCP tools act, systems hold the data.</p>
+  </div>
+  <div class="rail" id="rail"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+
+  <div class="controls">
+    <button class="primary" id="play" type="button">Pause</button>
+    <button id="replay" type="button">Replay</button>
+    <div class="sound" role="group" aria-label="Sound">
+      Sound
+      <button type="button" id="soundBtn" aria-pressed="true">On</button>
+    </div>
+    <div class="speed" role="group" aria-label="Speed">Speed
+      <button type="button" data-s="0.5" aria-pressed="false">0.5×</button>
+      <button type="button" data-s="1" aria-pressed="true">1×</button>
+      <button type="button" data-s="1.5" aria-pressed="false">1.5×</button>
+    </div>
+  </div>
+
+  <section class="anatomy" aria-label="Three-layer stack at a glance">
+    <h2>The 3-layer stack, at a glance</h2>
+    <div class="flow">
+      <svg viewBox="0 0 1080 180" role="img" aria-label="Three-layer stack: orchestration, reasoning, tools over systems">
+        <rect width="1080" height="180" fill="#16212d"/>
+        <!-- Layer 1: Orchestration -->
+        <rect x="48" y="24" width="984" height="40" rx="10" fill="#0f1720" stroke="#ffb547" stroke-width="1.5"/>
+        <text x="72" y="48" fill="#ffb547" font-size="13" font-weight="600">1 · ORCHESTRATION</text>
+        <text x="280" y="48" fill="#8297ab" font-size="12">n8n — Webhook · Switch · Data Table · MCP Client</text>
+        <text x="1008" y="48" fill="#4d6276" font-size="11" text-anchor="end">triggers · routes · writes</text>
+        <!-- Layer 2: Reasoning -->
+        <rect x="48" y="72" width="984" height="40" rx="10" fill="#0f1720" stroke="#5cc8ff" stroke-width="1.5"/>
+        <text x="72" y="96" fill="#5cc8ff" font-size="13" font-weight="600">2 · REASONING</text>
+        <text x="280" y="96" fill="#8297ab" font-size="12">Claude — system prompt · JSON schema · decision</text>
+        <text x="1008" y="96" fill="#4d6276" font-size="11" text-anchor="end">classifies · requests tools</text>
+        <!-- Layer 3: Tools + Systems -->
+        <rect x="48" y="120" width="984" height="40" rx="10" fill="#0f1720" stroke="#b18cff" stroke-width="1.5"/>
+        <text x="72" y="144" fill="#b18cff" font-size="13" font-weight="600">3 · TOOLS → SYSTEMS</text>
+        <text x="320" y="144" fill="#8297ab" font-size="12">MCP — lookup / get / search / create → CRM · KB · tickets</text>
+        <text x="1008" y="144" fill="#3ddc97" font-size="11" text-anchor="end">acts · returns data</text>
+      </svg>
+    </div>
+    <div class="notes">
+      <p><strong>n8n owns the loop</strong>Webhook in, Switch out, Data Table write-back. Claude never talks to CRM directly — <code class="r">MCP Client</code> does.</p>
+      <p><strong>Claude owns the judgment</strong>System prompt + schema force structured output. Tool requests are proposals; <code>n8n</code> executes them.</p>
+      <p><strong>MCP owns the I/O</strong><code class="t">lookup_customer</code> / <code class="t">create_ticket</code> hit real systems. One automation stitches all three layers.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REQ = '#5cc8ff', RES = '#ffb547', OK = '#3ddc97', TOOL = '#b18cff', SSE = '#5eead4', LINE = '#2a3a4b', MUTED = '#8297ab', DIM = '#4d6276';
+
+  const packet = $('packet'), pill = $('pill'), pillText = $('pillText'), whoText = $('whoText'), dot = $('dot');
+  const toast = $('toast'), toastInner = $('toastInner'), toastText = $('toastText');
+  const stepN = $('stepN'), stepText = $('stepText');
+  const rail = [...$('rail').children];
+  const n8nLeds = [...document.querySelectorAll('.n8nLed')];
+  const claudeLeds = [...document.querySelectorAll('.claudeLed')];
+  const mcpLeds = [...document.querySelectorAll('.mcpLed')];
+  const sysLeds = [...document.querySelectorAll('.sysLed')];
+
+  const floaters = [
+    { id: 'colN8n', amp: 2.2, speed: 0.18, phase: 0.1 },
+    { id: 'colClaude', amp: 2.0, speed: 0.15, phase: 1.1 },
+    { id: 'colMcp', amp: 2.1, speed: 0.17, phase: 2.0 },
+    { id: 'colSys', amp: 1.8, speed: 0.14, phase: 2.8 },
+  ];
+
+  /*
+   * PHASE ARRAY — edit `txt` captions freely for slide wording.
+   * Fields: k (key for ?at=), d (seconds), step (rail 1–8), from/to (packet),
+   * label (pill), who (executor under packet), c (colour), wire, txt (caption HTML), tone.
+   */
+  const P = [
+    // step 0 — establish the stage
+    { k:'idle', d:1.4, step:0,
+      txt:'Four columns: <code class="r">n8n</code> orchestrates, <code>Claude</code> reasons, <code class="t">MCP</code> tools act, <code class="o">systems</code> hold the data.',
+      tone:'rest' },
+
+    // step 1 — webhook fires
+    { k:'webhook', d:2.0, step:1, from:[10,132], to:[141,132],
+      label:'POST /webhook', who:'requester → n8n', c:RES, wire:'in',
+      txt:'Webhook fires: <code class="r">“Order 1042 damaged — refund?”</code> lands on the n8n trigger.',
+      tone:'whoosh' },
+
+    // step 2 — n8n → Claude
+    { k:'toClaude', d:2.2, step:2, from:[262,200], to:[408,150],
+      label:'prompt + schema', who:'n8n → Claude', c:REQ, wire:'n8nClaude',
+      txt:'n8n sends the system prompt + user text to <code>Claude</code> with a JSON schema contract.',
+      tone:'whoosh' },
+
+    // step 3 — Claude asks for a tool
+    { k:'toolAsk', d:2.0, step:3, from:[408,280], to:[262,280],
+      label:'tool_use: lookup_customer', who:'Claude → n8n', c:REQ, wire:'claudeN8n',
+      txt:'Claude asks for <code class="t">lookup_customer</code> — it does not call CRM itself.',
+      tone:'blip' },
+
+    // step 4a — n8n MCP client → MCP server
+    { k:'mcpCall', d:2.0, step:4, from:[141,400], to:[672,124],
+      label:'tools/call lookup_customer', who:'n8n MCP client', c:TOOL, wire:'n8nMcp',
+      txt:'n8n MCP Client → MCP server: <code class="t">tools/call lookup_customer({ email })</code>.',
+      tone:'whoosh' },
+
+    // step 4b — MCP → CRM
+    { k:'crmHit', d:1.8, step:4, from:[790,124], to:[939,140],
+      label:'read customers.json', who:'MCP → CRM', c:OK, wire:'mcpSys',
+      txt:'MCP server reads <code class="o">CRM JSON</code> and returns the customer record.',
+      tone:'chime' },
+
+    // step 4c — result back to Claude path
+    { k:'toolResult', d:2.0, step:4, from:[939,140], to:[408,280],
+      label:'tool_result', who:'MCP → n8n → Claude', c:OK, wire:'sysBack',
+      txt:'Result hops back: CRM → MCP → n8n → Claude as a <code class="o">tool_result</code>.',
+      tone:'whoosh' },
+
+    // step 5 — decision JSON
+    { k:'decision', d:2.2, step:5, from:[408,396], to:[141,224],
+      label:'decision JSON', who:'Claude → n8n', c:REQ, wire:'claudeN8n',
+      txt:'Claude returns decision JSON: <code>{ category:"refund", confidence:0.91 }</code>.',
+      tone:'blip' },
+
+    // step 6 — Switch branches
+    { k:'switch', d:1.8, step:6,
+      txt:'n8n <code class="r">Switch</code> branches on <code>category</code> → refund path.',
+      tone:'soft' },
+
+    // step 7 — write-back
+    { k:'writeback', d:2.0, step:7, from:[141,316], to:[939,360],
+      label:'create_ticket row', who:'n8n → MCP → tickets', c:OK, wire:'write',
+      txt:'Write-back: <code class="t">create_ticket</code> inserts a row into the <code class="o">ticket table</code>.',
+      tone:'whoosh' },
+
+    // step 8 — reply
+    { k:'reply', d:2.0, step:8, from:[141,132], to:[10,132],
+      label:'200 · reply', who:'n8n → requester', c:RES, wire:'out',
+      txt:'Reply sent to requester. One run: trigger → reason → act → write back.',
+      tone:'chime' },
+
+    // done
+    { k:'done', d:2.8, step:8,
+      txt:'Pattern: <strong>3 layers · 1 automation</strong> — n8n loops, Claude judges, MCP touches systems.',
+      tone:'resolve' },
+  ];
+
+  const at = k => P.findIndex(p => p.k === k);
+  const total = P.reduce((a, p) => a + p.d, 0);
+  let t = 0, speed = 1, playing = true, last = null, soundOn = true;
+  let lastToneKey = null;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(kind){
+    if (!soundOn || reduce) return;
+    try {
+      const ctx = ensureAudio();
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.07;
+      master.connect(ctx.destination);
+
+      const beep = (freq, start, dur, type = 'sine', gain = 1) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now + start);
+        g.gain.setValueAtTime(0, now + start);
+        g.gain.linearRampToValueAtTime(0.9 * gain, now + start + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        o.connect(g); g.connect(master);
+        o.start(now + start); o.stop(now + start + dur + 0.02);
+      };
+
+      if (kind === 'whoosh'){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(220, now);
+        o.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(900, now);
+        f.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.08);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(now); o.stop(now + 0.58);
+      } else if (kind === 'blip'){
+        beep(520, 0, 0.18, 'sine', 0.7);
+        beep(780, 0.08, 0.16, 'sine', 0.45);
+      } else if (kind === 'chime'){
+        beep(523.25, 0, 0.35, 'sine', 0.55);
+        beep(659.25, 0.12, 0.4, 'sine', 0.45);
+        beep(783.99, 0.24, 0.5, 'triangle', 0.35);
+      } else if (kind === 'soft'){
+        beep(392, 0, 0.4, 'sine', 0.4);
+      } else if (kind === 'resolve'){
+        beep(392, 0, 0.35, 'sine', 0.45);
+        beep(523.25, 0.15, 0.4, 'sine', 0.5);
+        beep(659.25, 0.32, 0.55, 'triangle', 0.4);
+      } else if (kind === 'rest'){
+        beep(246.94, 0, 0.5, 'sine', 0.25);
+      }
+    } catch (_) { /* autoplay / unsupported */ }
+  }
+
+  function setStroke(el, color){ if (el) el.setAttribute('stroke', color); }
+  function setFill(el, color){ if (el) el.setAttribute('fill', color); }
+  function setOp(el, o){ if (el) el.setAttribute('opacity', o); }
+
+  function lightTool(i, on, color){
+    const g = $('tool' + i);
+    if (!g) return;
+    const box = g.querySelector('.tBox');
+    const dotEl = g.querySelector('.tDot');
+    if (box) setStroke(box, on ? color : LINE);
+    if (dotEl) setFill(dotEl, on ? color : LINE);
+  }
+
+  function lightNode(id, on, color, opacity){
+    const g = $(id);
+    if (!g) return;
+    const box = g.querySelector('.nBox, .sBox, .tBox');
+    if (box){
+      setStroke(box, on ? color : LINE);
+      if (opacity != null) setOp(box, opacity);
+      else setOp(box, on ? 1 : 0.55);
+    }
+  }
+
+  function setWire(id, on, color){
+    const path = $(id);
+    const lbl = $(id + 'Lbl');
+    if (path){
+      path.setAttribute('stroke', on ? color : LINE);
+      path.setAttribute('opacity', on ? 1 : 0.45);
+    }
+    if (lbl) lbl.setAttribute('fill', on ? color : DIM);
+  }
+
+  function pulseLeds(leds, on, color){
+    leds.forEach((l, i) => setFill(l, on && Math.floor(t * 8 + i) % 3 === 0 ? color : LINE));
+  }
+
+  function render(){
+    let acc = 0, ph = P[0], idx = 0, local = 0;
+    for (let i = 0; i < P.length; i++){
+      if (t < acc + P[i].d || i === P.length - 1){
+        ph = P[i]; idx = i; local = clamp((t - acc) / ph.d); break;
+      }
+      acc += P[i].d;
+    }
+    const lt = local * ph.d;
+    const reached = k => idx > at(k) || ph.k === k;
+
+    let tp = ph;
+    for (let i = idx; i >= 0 && !tp.txt; i--) tp = P[i];
+    stepN.textContent = ph.step;
+    if (stepText.innerHTML !== tp.txt) stepText.innerHTML = tp.txt;
+    rail.forEach((r, i) => {
+      const stepIdx = i + 1;
+      r.className = stepIdx <= ph.step ? 'on' + (ph.k === 'done' ? ' done' : '') : '';
+    });
+
+    const toneKey = ph.k + ':' + Math.floor(acc);
+    if (ph.tone && toneKey !== lastToneKey && local < 0.08){
+      lastToneKey = ph.k + ':' + idx;
+      tone(ph.tone);
+    }
+
+    const drift = reduce ? 0 : 1;
+    floaters.forEach(f => {
+      const y = Math.sin(t * f.speed + f.phase) * f.amp * drift;
+      const x = Math.cos(t * f.speed * 0.7 + f.phase) * (f.amp * 0.35) * drift;
+      $(f.id).setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    });
+
+    // --- Column frames ---
+    const n8nHot = ['webhook','toClaude','toolAsk','mcpCall','toolResult','decision','switch','writeback','reply','done'].includes(ph.k) || reached('webhook');
+    const claudeHot = reached('toClaude');
+    const mcpHot = reached('mcpCall');
+    const sysHot = reached('crmHit');
+
+    setStroke($('n8nFrame'), ph.k === 'done' ? OK : (n8nHot ? RES : LINE));
+    setStroke($('claudeFrame'), ph.k === 'done' ? OK : (claudeHot ? REQ : LINE));
+    setStroke($('mcpFrame'), ph.k === 'done' ? OK : (mcpHot ? TOOL : LINE));
+    setStroke($('sysFrame'), ph.k === 'done' ? OK : (sysHot ? OK : LINE));
+
+    pulseLeds(n8nLeds, n8nHot, RES);
+    pulseLeds(claudeLeds, claudeHot, REQ);
+    pulseLeds(mcpLeds, mcpHot, TOOL);
+    pulseLeds(sysLeds, sysHot, OK);
+
+    // --- n8n nodes ---
+    lightNode('nodeWebhook', reached('webhook'), RES, reached('webhook') ? 1 : 0.55);
+    $('webhookLine').textContent = reached('webhook') ? 'Order 1042 damaged' : 'waiting…';
+    setFill($('webhookLine'), reached('webhook') ? '#e6edf3' : DIM);
+    $('webhookSub').textContent = reached('webhook') ? 'refund? · inbound' : '';
+    setFill($('webhookSub'), reached('webhook') ? RES : DIM);
+
+    lightNode('nodeSwitch', reached('switch'), RES, reached('switch') ? 1 : 0.55);
+    $('switchLine').textContent = reached('switch') ? '→ refund' : (reached('decision') ? 'awaiting branch' : 'idle');
+    setFill($('switchLine'), reached('switch') ? '#e6edf3' : DIM);
+    setFill($('switchSub'), reached('switch') ? RES : DIM);
+
+    lightNode('nodeTable', reached('writeback'), RES, reached('writeback') ? 1 : 0.55);
+    $('tableLine').textContent = reached('writeback') ? 'row written' : 'no write yet';
+    setFill($('tableLine'), reached('writeback') ? '#e6edf3' : DIM);
+
+    lightNode('nodeMcpClient', reached('mcpCall'), TOOL, reached('mcpCall') ? 1 : 0.55);
+    $('mcpClientLine').textContent = ph.k === 'mcpCall' ? 'calling lookup…' : (reached('mcpCall') ? 'tool bridge live' : 'AI Agent → tools');
+    setFill($('mcpClientLine'), reached('mcpCall') ? TOOL : DIM);
+
+    // --- Claude nodes ---
+    lightNode('nodePrompt', reached('toClaude'), REQ, reached('toClaude') ? 1 : 0.55);
+    setFill($('promptLine1'), reached('toClaude') ? '#e6edf3' : DIM);
+    setFill($('promptLine2'), reached('toClaude') ? MUTED : DIM);
+    setFill($('promptLine3'), reached('toClaude') ? REQ : DIM);
+
+    lightNode('nodeSchema', reached('toClaude'), REQ, reached('toClaude') ? 1 : 0.55);
+    const schemaOn = reached('decision');
+    $('schemaCat').textContent = schemaOn ? 'category: "refund"' : 'category: enum';
+    $('schemaPri').textContent = schemaOn ? 'priority: "high"' : 'priority: enum';
+    $('schemaConf').textContent = schemaOn ? 'confidence: 0.91' : 'confidence: 0–1';
+    setFill($('schemaCat'), schemaOn ? OK : (reached('toClaude') ? '#e6edf3' : DIM));
+    setFill($('schemaPri'), schemaOn ? '#e6edf3' : (reached('toClaude') ? '#e6edf3' : DIM));
+    setFill($('schemaConf'), schemaOn ? OK : (reached('toClaude') ? '#e6edf3' : DIM));
+    setFill($('schemaSum'), reached('toClaude') ? MUTED : DIM);
+
+    lightNode('nodeDecision', reached('decision'), REQ, reached('decision') ? 1 : 0.55);
+    if (ph.k === 'toolAsk'){
+      $('decisionLine').textContent = 'needs tool…';
+      $('decisionSub').textContent = 'lookup_customer';
+    } else if (reached('decision')){
+      $('decisionLine').textContent = 'refund · 0.91';
+      $('decisionSub').textContent = 'end_turn';
+    } else {
+      $('decisionLine').textContent = 'awaiting…';
+      $('decisionSub').textContent = '';
+    }
+    setFill($('decisionLine'), reached('toolAsk') ? '#e6edf3' : DIM);
+    setFill($('decisionSub'), reached('toolAsk') ? REQ : DIM);
+
+    // --- MCP tools ---
+    lightTool(0, ph.k === 'mcpCall' || ph.k === 'crmHit' || (reached('mcpCall') && !reached('writeback')), TOOL);
+    lightTool(1, false, TOOL);
+    lightTool(2, false, TOOL);
+    lightTool(3, ph.k === 'writeback' || reached('writeback'), OK);
+    if (reached('mcpCall') && !['mcpCall','crmHit','toolResult'].includes(ph.k) && !reached('writeback')){
+      lightTool(0, true, TOOL);
+    }
+    $('mcpBadge').setAttribute('stroke', mcpHot ? TOOL : LINE);
+    $('mcpBadgeText').setAttribute('fill', mcpHot ? TOOL : DIM);
+    $('mcpBadgeText').textContent = mcpHot ? 'session · tools live' : 'ops-mcp :3200/mcp';
+
+    // --- Systems ---
+    lightNode('sysCrm', reached('crmHit'), OK, reached('crmHit') ? 1 : 0.55);
+    $('crmLine').textContent = reached('crmHit') ? 'cust_8842 · gold' : 'customers.json';
+    setFill($('crmLine'), reached('crmHit') ? '#e6edf3' : DIM);
+    $('crmSub').textContent = reached('crmHit') ? 'email matched' : 'id · tier · email';
+    setFill($('crmSub'), reached('crmHit') ? OK : DIM);
+
+    lightNode('sysKb', false, OK, 0.55);
+
+    lightNode('sysTickets', reached('writeback'), OK, reached('writeback') ? 1 : 0.55);
+    $('ticketLine').textContent = reached('writeback') ? 'TKT-1204 created' : 'no rows yet';
+    setFill($('ticketLine'), reached('writeback') ? '#e6edf3' : DIM);
+    $('ticketSub').textContent = reached('writeback') ? 'refund · ops' : 'category · owner';
+    setFill($('ticketSub'), reached('writeback') ? OK : DIM);
+    $('ticketSub2').textContent = reached('reply') ? 'requester notified' : '';
+    setFill($('ticketSub2'), reached('reply') ? MUTED : DIM);
+
+    // --- Wires ---
+    setWire('wireN8nClaude', ph.wire === 'n8nClaude' || ph.k === 'toClaude', REQ);
+    setWire('wireClaudeN8n', ph.wire === 'claudeN8n' || ['toolAsk','decision'].includes(ph.k), REQ);
+    setWire('wireN8nMcp', ph.wire === 'n8nMcp' || ph.k === 'mcpCall' || ph.wire === 'write', TOOL);
+    setWire('wireMcpSys', ph.wire === 'mcpSys' || ph.wire === 'write' || ph.k === 'crmHit', OK);
+    setWire('wireSysMcp', ph.wire === 'sysBack' || ph.k === 'toolResult', OK);
+    setWire('wireMcpN8n', ph.wire === 'sysBack' || ph.k === 'toolResult', RES);
+
+    // --- Flying packet ---
+    if (ph.from){
+      const e = ease(local);
+      const x = lerp(ph.from[0], ph.to[0], e);
+      const y = lerp(ph.from[1], ph.to[1], e);
+      packet.setAttribute('opacity', Math.min(1, local * 5, (1 - local) * 5 + 0.25));
+      packet.setAttribute('transform', `translate(${x} ${y})`);
+      const w = Math.min(300, Math.max(120, ph.label.length * 7.2 + 32));
+      pill.setAttribute('x', -w / 2);
+      pill.setAttribute('width', w);
+      pill.setAttribute('stroke', ph.c);
+      pillText.textContent = ph.label;
+      pillText.setAttribute('fill', ph.c);
+      whoText.textContent = ph.who || '';
+      whoText.setAttribute('fill', MUTED);
+      dot.setAttribute('fill', ph.c);
+    } else {
+      packet.setAttribute('opacity', 0);
+    }
+
+    // --- Success toast ---
+    if (ph.k === 'done'){
+      const s = clamp(lt / 0.5), out = clamp((lt - (ph.d - 0.6)) / 0.45);
+      const label = '3 layers · 1 automation';
+      toastText.textContent = label;
+      const w = label.length * 8.2 + 70;
+      $('toastBg').setAttribute('x', -w / 2);
+      $('toastBg').setAttribute('width', w);
+      toastInner.querySelector('circle').setAttribute('cx', -w / 2 + 26);
+      toastInner.querySelector('path').setAttribute('d', `M${-w / 2 + 21} 0l4 4 8-9`);
+      toastText.setAttribute('x', 14);
+      toast.setAttribute('opacity', s * (1 - out));
+      toastInner.setAttribute('transform', `translate(0 ${(1 - s) * 16 - out * 10}) scale(${Math.max(back(s) * (1 - out * 0.15), 0.01)})`);
+      setStroke($('n8nFrame'), OK);
+      setStroke($('claudeFrame'), OK);
+      setStroke($('mcpFrame'), OK);
+      setStroke($('sysFrame'), OK);
+    } else {
+      toast.setAttribute('opacity', 0);
+    }
+  }
+
+  function frame(ts){
+    if (last == null) last = ts;
+    const dt = Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    if (playing){
+      t += dt * speed;
+      if (t >= total){ t = 0; lastToneKey = null; }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  const playBtn = $('play');
+  const sync = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    if (playing && soundOn) ensureAudio();
+    sync();
+  });
+  $('replay').addEventListener('click', () => {
+    t = 0; lastToneKey = null; playing = true;
+    if (soundOn) ensureAudio();
+    sync();
+  });
+  document.querySelectorAll('.speed button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.speed button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+
+  const soundBtn = $('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? 'On' : 'Off';
+    soundBtn.setAttribute('aria-pressed', soundOn);
+    if (soundOn){ ensureAudio(); tone('soft'); }
+  });
+
+  const unlock = () => { if (soundOn) ensureAudio(); window.removeEventListener('pointerdown', unlock); };
+  window.addEventListener('pointerdown', unlock);
+
+  const jump = new URLSearchParams(location.search).get('at');
+  if (jump && at(jump) >= 0){
+    const i = at(jump);
+    t = P.slice(0, i).reduce((a, p) => a + p.d, 0) + P[i].d * 0.55;
+    playing = false;
+  } else if (reduce){
+    t = total - 1.4;
+    playing = false;
+  }
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

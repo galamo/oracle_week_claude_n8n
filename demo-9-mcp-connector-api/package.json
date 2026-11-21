@@ -1,0 +1,14 @@
+{
+  "name": "demo-9-mcp-connector-api",
+  "version": "1.0.0",
+  "description": "Seminar Demo 9: Anthropic MCP connector — one Messages API call, Anthropic calls our MCP server itself",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node src/run-demo.js",
+    "tunnel": "npx -y cloudflared tunnel --url http://localhost:3200"
+  }
+}

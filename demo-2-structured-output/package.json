@@ -1,0 +1,15 @@
+{
+  "name": "demo-2-structured-output",
+  "version": "1.0.0",
+  "description": "Seminar Demo 2: free text vs JSON-in-the-prompt vs structured outputs, consumed by an n8n-style Switch",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node src/run-demo.js",
+    "curl:free-text": "bash requests/curl.sh 1-free-text.json",
+    "curl:structured": "bash requests/curl.sh 2-structured.json"
+  }
+}

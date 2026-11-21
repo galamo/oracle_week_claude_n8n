@@ -1,0 +1,21 @@
+---
+description: Rules for building and changing the ops MCP server
+globs: demo-5-ops-mcp-server/**/*.js
+alwaysApply: false
+---
+
+# MCP server rules
+
+Copy this file to `.cursor/rules/mcp-server.mdc` in the repo root.
+
+- Transport: Streamable HTTP only, stateless, via `createMcpHandler()` from `@modelcontextprotocol/server` (SDK v2). Never add stdio or the deprecated HTTP+SSE (`/sse`) endpoints to this project.
+- Keep `legacy: 'stateless'` so 2025-era clients (n8n, older Cursor) still work.
+- Every tool:
+  - snake_case name, one responsibility
+  - description written as a prompt: when to use it, what it returns, side effects (read-only / WRITE — requires human approval), and the not-found / failure case
+  - zod input schema; enums instead of free strings where values are known; strict formats (e.g. order_id 4–8 digits)
+  - returns JSON via the `result()` helper (text content + structuredContent); errors set `isError: true`
+  - read tools set `annotations.readOnlyHint: true`
+- Security: keep the bearer-token check and the Host allow-list; never log tokens or full request bodies with emails.
+- Data lives only in `./data/*.json`. No shell, SQL, network calls or file paths in tool inputs.
+- After changing tools, run `npm test` and `npm run test:modern`.

@@ -1,0 +1,182 @@
+[
+  {
+    "customer_id": "C-1001",
+    "name": "Dana Cohen",
+    "email": "dana.cohen@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2024-05-08",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1002",
+    "name": "Yossi Levi",
+    "email": "yossi.levi@example.com",
+    "tier": "standard",
+    "country": "DE",
+    "customer_since": "2019-11-24",
+    "open_tickets": 2
+  },
+  {
+    "customer_id": "C-1003",
+    "name": "Noa Mizrahi",
+    "email": "noa.mizrahi@example.com",
+    "tier": "standard",
+    "country": "UK",
+    "customer_since": "2022-01-01",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1004",
+    "name": "Avi Peretz",
+    "email": "avi.peretz@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2023-10-01",
+    "open_tickets": 2
+  },
+  {
+    "customer_id": "C-1005",
+    "name": "Maya Biton",
+    "email": "maya.biton@example.com",
+    "tier": "standard",
+    "country": "DE",
+    "customer_since": "2024-12-18",
+    "open_tickets": 1
+  },
+  {
+    "customer_id": "C-1006",
+    "name": "Eitan Friedman",
+    "email": "eitan.friedman@example.com",
+    "tier": "standard",
+    "country": "US",
+    "customer_since": "2023-05-26",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1007",
+    "name": "Shira Shapiro",
+    "email": "shira.shapiro@example.com",
+    "tier": "standard",
+    "country": "DE",
+    "customer_since": "2022-06-09",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1008",
+    "name": "Omer Katz",
+    "email": "omer.katz@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2019-02-13",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1009",
+    "name": "Tamar Golan",
+    "email": "tamar.golan@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2023-05-26",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1010",
+    "name": "Lior Azulay",
+    "email": "lior.azulay@example.com",
+    "tier": "gold",
+    "country": "UK",
+    "customer_since": "2019-07-03",
+    "open_tickets": 2
+  },
+  {
+    "customer_id": "C-1011",
+    "name": "Sarah Miller",
+    "email": "sarah.miller@example.com",
+    "tier": "standard",
+    "country": "DE",
+    "customer_since": "2023-06-19",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1012",
+    "name": "David Smith",
+    "email": "david.smith@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2024-04-25",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1013",
+    "name": "Emma Brown",
+    "email": "emma.brown@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2025-02-13",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1014",
+    "name": "James Wilson",
+    "email": "james.wilson@example.com",
+    "tier": "gold",
+    "country": "DE",
+    "customer_since": "2025-06-06",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1015",
+    "name": "Olivia Taylor",
+    "email": "olivia.taylor@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2024-05-23",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1016",
+    "name": "Daniel Davis",
+    "email": "daniel.davis@example.com",
+    "tier": "platinum",
+    "country": "DE",
+    "customer_since": "2020-09-24",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1017",
+    "name": "Mia Clark",
+    "email": "mia.clark@example.com",
+    "tier": "standard",
+    "country": "US",
+    "customer_since": "2022-05-21",
+    "open_tickets": 2
+  },
+  {
+    "customer_id": "C-1018",
+    "name": "Noah Lewis",
+    "email": "noah.lewis@example.com",
+    "tier": "standard",
+    "country": "DE",
+    "customer_since": "2021-01-08",
+    "open_tickets": 0
+  },
+  {
+    "customer_id": "C-1019",
+    "name": "Liam Walker",
+    "email": "liam.walker@example.com",
+    "tier": "standard",
+    "country": "US",
+    "customer_since": "2021-02-07",
+    "open_tickets": 2
+  },
+  {
+    "customer_id": "C-1020",
+    "name": "Ava Hall",
+    "email": "ava.hall@example.com",
+    "tier": "standard",
+    "country": "IL",
+    "customer_since": "2024-08-13",
+    "open_tickets": 1
+  }
+]

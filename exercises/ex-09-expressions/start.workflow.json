@@ -1,0 +1,133 @@
+{
+  "name": "Ex 9 — Expressions drill (start)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "map",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "59d9d019-7d9f-4c9d-bf12-0cc689c3d7a4",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "8e2e4adb-7bfd-41a9-b402-26cbf6532a4f"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "549b0829-dce2-441e-b064-6006d73111e1",
+              "name": "text",
+              "value": "TODO: the request text, trimmed",
+              "type": "string"
+            },
+            {
+              "id": "3959516e-2b88-4beb-888a-19870287529f",
+              "name": "email",
+              "value": "TODO: body.email, or 'n/a' when missing",
+              "type": "string"
+            },
+            {
+              "id": "35d5f6b3-7476-406c-8131-80345ceb4680",
+              "name": "channel",
+              "value": "TODO: body.channel, or 'web' when missing",
+              "type": "string"
+            },
+            {
+              "id": "a9e4e53e-80c9-4d4f-be3f-3dca9844736b",
+              "name": "customer_name",
+              "value": "TODO: body.customer.name — careful, customer may be missing",
+              "type": "string"
+            },
+            {
+              "id": "5b43b07a-3632-486b-872f-f18f3827c1df",
+              "name": "received_at",
+              "value": "TODO: the current time as ISO string",
+              "type": "string"
+            },
+            {
+              "id": "a5715385-5daa-4d2d-a8b9-f5fc5b6d17db",
+              "name": "prompt_preview",
+              "value": "TODO: one sentence combining name, email, channel and text",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eb8c4c24-d339-4ada-bfd5-4ac372046fdb",
+      "name": "Map fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "30776e7b-ff4b-42c0-a778-79bba29b166b",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Ex 9 — Expressions drill\nTest with and without optional fields:\ncurl -X POST localhost:5678/webhook-test/map -H \"content-type: application/json\" -d '{\"text\":\"  hi  \",\"email\":\"a@b.com\",\"channel\":\"whatsapp\",\"customer\":{\"name\":\"Dana\"}}'\ncurl -X POST localhost:5678/webhook-test/map -H \"content-type: application/json\" -d '{\"text\":\"hi\"}'\n\nBoth must respond without errors.",
+        "height": 230,
+        "width": 600
+      },
+      "id": "f18cf581-2d37-468c-a68e-21efc15b2e64",
+      "name": "Note d3bb",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        20
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Map fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map fields": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
