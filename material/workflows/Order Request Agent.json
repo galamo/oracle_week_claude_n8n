@@ -1,0 +1,330 @@
+{
+  "name": "Order Request Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Order Request (Agent)",
+        "formDescription": "Same goals as the deterministic form — status, details, or refund — but an AI agent decides which tools to call.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Order ID",
+              "fieldName": "order_id",
+              "placeholder": "e.g. ORD-1001",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Action",
+              "fieldType": "dropdown",
+              "fieldName": "action",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "status"
+                  },
+                  {
+                    "option": "details"
+                  },
+                  {
+                    "option": "refund"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "buttonLabel": "Submit",
+          "path": "order-request-agent"
+        }
+      },
+      "id": "83fc677e-55d5-47cf-a21b-b376d463fa2d",
+      "name": "Order Request Agent Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "e46a4bbd-7bc7-4aa1-bdf1-024dce97c8ec"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "y0ob7J705ydQ2jtW",
+          "cachedResultName": "OrderFormSubmissions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $('Order Request Agent Form').item.json.order_id }}",
+            "action": "={{ $('Order Request Agent Form').item.json.action }}",
+            "submitted_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1b42d11b-09b7-4303-bc87-b3569ec574e7",
+      "name": "Log Form Submission",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Order ID: ' + $('Order Request Agent Form').item.json.order_id + '\\nRequested action: ' + $('Order Request Agent Form').item.json.action }}",
+        "options": {
+          "systemMessage": "You are an order-support agent for the same outcomes as the deterministic Order Request Form workflow.\n\nAvailable sample order IDs: ORD-1001, ORD-1002, ORD-1003, ORD-1004.\n\nTools:\n- Lookup Order: read the Orders data table by order_id. Returns status, customer_name, amount, and details.\n- Send Refund Email: emails a refund request to galamouyal88@gmail.com from no_reply@infrasync.org.\n\nHow to handle the requested action:\n- status: call Lookup Order, then reply with only the order_id and status. If missing, say the order was not found.\n- details: call Lookup Order, then reply with order_id, customer_name, status, amount, and details. If missing, say the order was not found.\n- refund: call Send Refund Email with a clear subject and body that include the order ID. Do not look up the order first unless helpful. Then confirm that the refund request was emailed to galamouyal88@gmail.com.\n- anything else: explain that supported actions are status, details, and refund.\n\nDecide which tool(s) to call yourself. Keep replies concise and factual. Do not invent order data.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "23f79338-03c7-41c7-8a76-41a336645a42",
+      "name": "Order Request Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        528,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-sonnet-5.5",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "952395a8-357e-4550-b801-81c358870bfd",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        512,
+        672
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "ycEvxLfDyjjUA8Xq",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YIyS0juGGo0KdcYe",
+          "cachedResultName": "Orders"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "order_id",
+              "keyValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('order_id', 'The order ID to look up, for example ORD-1001') }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "0f655e54-d853-402e-8b12-81469b40ebe4",
+      "name": "Lookup Order",
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no_reply@infrasync.org",
+        "toEmail": "galamouyal88@gmail.com",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('subject', 'Refund email subject including the order ID') }}",
+        "emailFormat": "text",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('text', 'Refund request email body with order ID and timestamp') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c494f352-528e-438c-8413-d5e1436b42a8",
+      "name": "Send Refund Email",
+      "type": "n8n-nodes-base.emailSendTool",
+      "typeVersion": 2.1,
+      "position": [
+        832,
+        672
+      ],
+      "webhookId": "3db47a2c-4dfe-422f-901b-6be2389a6fba",
+      "credentials": {
+        "smtp": {
+          "id": "wuEZxYnJr03fgXUD",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Agent Response",
+        "completionMessage": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "f922fc1c-580f-4109-86a2-61b2260be3bd",
+      "name": "Show Agent Result",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        816,
+        400
+      ],
+      "webhookId": "4e7429b9-0b88-42d2-869f-89b6c7b7d6b9"
+    },
+    {
+      "parameters": {
+        "content": "Non-deterministic twin of Order Request Form. Uses OpenRouter account + anthropic/claude-sonnet-5.5. Tools: Lookup Order and Send Refund Email. Sample IDs: ORD-1001 to ORD-1004. Publish, then open path order-request-agent.",
+        "height": 224,
+        "width": 816,
+        "color": 5
+      },
+      "id": "94fcba39-8e91-47f2-93cc-e981eaf194e2",
+      "name": "Sticky Note 9e8d1be6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Order Request Agent Form": {
+      "main": [
+        [
+          {
+            "node": "Log Form Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Form Submission": {
+      "main": [
+        [
+          {
+            "node": "Order Request Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Request Agent": {
+      "main": [
+        [
+          {
+            "node": "Show Agent Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Order Request Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Order": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Request Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Refund Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Request Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "f5676040-ff32-42db-a901-5d271ef978b5",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "1b2b2de92718492c19dd9dc5886350d5014f11351ddb60f6141f65346415f587"
+  },
+  "nodeGroups": [],
+  "id": "1ilcjDgIrngwLpXX",
+  "tags": []
+}

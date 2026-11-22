@@ -13,3 +13,4 @@ ignore.docker.compose
 ignore.docker.compose.mode
 
 seed.js
+*n8n/docker-compose.yml

@@ -6,7 +6,7 @@
 
 ## API keys
 
-[Get an OpenRouter key](https://galamo.app.n8n.cloud/form-test/get-openrouter-key)
+[Get an OpenRouter key](https://galamo.app.n8n.cloud/form/get-openrouter-key)
 
 Seminar repo for **"Agentic Automation: Claude, MCP & n8n in Practice"**. Claude is called through **OpenRouter** (except Demo 9, which needs a direct Anthropic key).
 
