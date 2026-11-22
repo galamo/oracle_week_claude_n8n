@@ -1,7 +1,7 @@
 // Ticket Board UI — vanilla JS talking to the backend REST API (same origin).
 const state = { statuses: [], users: [], projects: [], sprints: [], tickets: [], editingId: null };
 const $ = (sel) => document.querySelector(sel);
-
+console.log("app.js loaded");
 async function api(path, options = {}) {
   const res = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
