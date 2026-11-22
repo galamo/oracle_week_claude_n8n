@@ -3,7 +3,7 @@ node_modules/
 .DS_Store
 
 # Local Docker bind-mount data (n8n SQLite, Postgres, pgAdmin)
-n8n/data/
+n8n**
 
 # Lecturer-only answer keys — never pushed to the student repo
 solutions/
@@ -13,4 +13,4 @@ ignore.docker.compose
 ignore.docker.compose.mode
 
 seed.js
-*n8n/docker-compose.yml
+n8n/docker-compose.yml
